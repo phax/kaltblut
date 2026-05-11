@@ -62,6 +62,17 @@
       <groupId>org.verapdf</groupId>
       <artifactId>validation-model</artifactId>
     </dependency>
+    <!--
+      veraPDF 1.26.x uses the legacy javax.xml.bind API (jaxb-api:2.4.0-b180830) but ships the
+      Jakarta-namespace jaxb-impl 4.x, which does not provide the com.sun.xml.bind.v2.ContextFactory
+      class the javax API tries to load. Pin the older 2.3.x JAXB runtime so JAXB can resolve at
+      runtime; otherwise validation-profile loading fails and every validation returns an error.
+    -->
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+      <version>2.3.9</version>
+    </dependency>
 
     <dependency>
       <groupId>org.slf4j</groupId>

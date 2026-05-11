@@ -105,6 +105,34 @@
         <version>${verapdf.version}</version>
       </dependency>
 
+      <!--
+        veraPDF 1.26.x uses the legacy javax.xml.bind API and expects com.sun.xml.bind.v2.ContextFactory
+        at runtime. The ph-commons BOM pins jaxb-runtime to a 4.x (Jakarta-namespace) version which
+        does not provide that class. Force the older 2.3.x line to keep veraPDF working. Declared
+        here (not transitively in flugesel-verapdf) so the version is also applied in flugesel-cli
+        when shading.
+      -->
+      <dependency>
+        <groupId>org.glassfish.jaxb</groupId>
+        <artifactId>jaxb-runtime</artifactId>
+        <version>2.3.9</version>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish.jaxb</groupId>
+        <artifactId>jaxb-core</artifactId>
+        <version>2.3.9</version>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish.jaxb</groupId>
+        <artifactId>txw2</artifactId>
+        <version>2.3.9</version>
+      </dependency>
+      <dependency>
+        <groupId>com.sun.activation</groupId>
+        <artifactId>jakarta.activation</artifactId>
+        <version>1.2.2</version>
+      </dependency>
+
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>

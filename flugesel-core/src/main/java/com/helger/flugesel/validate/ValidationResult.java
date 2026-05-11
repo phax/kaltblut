@@ -17,6 +17,7 @@
 package com.helger.flugesel.validate;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.annotation.style.ReturnsMutableCopy;
@@ -87,5 +88,46 @@ public final class ValidationResult
   public int getFindingCount ()
   {
     return m_aFindings.size ();
+  }
+
+  /**
+   * Find the first finding with the given rule identifier.
+   *
+   * @param sRuleID
+   *        the rule identifier to look for. May not be <code>null</code>.
+   * @return the first matching finding, or <code>null</code>.
+   */
+  @Nullable
+  public Finding findByRuleID (@NonNull final String sRuleID)
+  {
+    ValueEnforcer.notNull (sRuleID, "RuleID");
+    for (final Finding aF : m_aFindings)
+      if (sRuleID.equals (aF.getRuleID ()))
+        return aF;
+    return null;
+  }
+
+  /**
+   * @param sRuleID
+   *        the rule identifier to look for. May not be <code>null</code>.
+   * @return <code>true</code> if at least one finding matches the given rule identifier.
+   */
+  public boolean hasRule (@NonNull final String sRuleID)
+  {
+    return findByRuleID (sRuleID) != null;
+  }
+
+  /**
+   * @param sRuleID
+   *        the rule identifier to look for. May not be <code>null</code>.
+   * @return <code>true</code> if at least one finding matches and has {@link ESeverity#FATAL} severity.
+   */
+  public boolean hasFatalRule (@NonNull final String sRuleID)
+  {
+    ValueEnforcer.notNull (sRuleID, "RuleID");
+    for (final Finding aF : m_aFindings)
+      if (aF.getSeverity () == ESeverity.FATAL && sRuleID.equals (aF.getRuleID ()))
+        return true;
+    return false;
   }
 }
