@@ -29,7 +29,18 @@ The detection table covers every published release since 2014:
 | 2.3.3   | 1.07.3   | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 | 2.4     | 1.08     | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 
-## What flugesel Does (and Does Not Do)
+## Why "FlugEsel"?
+
+This project's name is a playful nod to ZUGFeRD, the German e-invoicing formatd it works with.
+
+In German, ZUGFeRD sounds like "Zugpferd" — literally a draft horse, the workhorse that pulls a carriage.
+  Fitting, since the standard is meant to be a reliable workhorse of electronic invoicing in Germany.
+
+FlugEsel continues the joke: Flug (flight) + Esel (donkey) = "flying donkey."
+Where ZUGFeRD is a sturdy draft horse plodding along the ground, FlugEsel is its lighter, more whimsical cousin — a donkey that somehow takes to the air.
+The name signals that this project handles ZUGFeRD documents, but with a lighter, faster, more unconventional approach.
+
+## What FlugEsel Does (and Does Not Do)
 
 | Tier | Concern                                                                                     | Status      |
 | ---- | ------------------------------------------------------------------------------------------- | ----------- |
@@ -71,7 +82,7 @@ IHybridSource s7 = HybridSource.fromClasspath ("samples/invoice.pdf");       // 
 
 `IHybridSource` is byte-array-centric: the contract is `byte[] getBytes() throws IOException`,
 plus `long getSize()` and `String getName()` as diagnostic hints. PDFBox 3 needs random access
-and every flugesel operation eventually needs the complete PDF in memory, so distinguishing
+and every FlugEsel operation eventually needs the complete PDF in memory, so distinguishing
 single-read from multi-read inputs added API surface without value. Implementations may read
 lazily on first call and cache the result; callers must not mutate the returned array.
 

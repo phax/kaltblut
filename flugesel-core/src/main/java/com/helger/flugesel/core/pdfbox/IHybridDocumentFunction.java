@@ -21,10 +21,8 @@ import java.io.IOException;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import com.helger.flugesel.core.source.IHybridSource;
-
 /**
- * Functional interface for {@link #withOpenDocument(IHybridSource, IHybridDocumentFunction)}.
+ * Functional interface to work with {@link HybridDocument}.
  *
  * @param <T>
  *        The response type
