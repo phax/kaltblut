@@ -85,14 +85,15 @@ public final class HybridExtractor
    * @param aSource
    *        the source. May not be <code>null</code>.
    * @param sName
-   *        the name to match (e.g. <code>factur-x.xml</code>, <code>list_of_measurement.xlsx</code>).
+   *        the name to match (e.g. <code>factur-x.xml</code>,
+   *        <code>list_of_measurement.xlsx</code>).
    * @return the bytes, or <code>null</code> if no embedded file matches.
    * @throws IOException
    *         on parsing failure.
    */
   @Nullable
-  public static byte [] extractAttachment (@NonNull final IHybridSource aSource,
-                                           @NonNull final String sName) throws IOException
+  public static byte [] extractAttachment (@NonNull final IHybridSource aSource, @NonNull final String sName)
+                                                                                                              throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (sName, "Name");

@@ -46,8 +46,8 @@ public final class HybridInspector
    *
    * @param aSource
    *        the source. May not be <code>null</code>.
-   * @return <code>true</code> if recognised, <code>false</code> otherwise (including when the
-   *         input is not a valid PDF).
+   * @return <code>true</code> if recognised, <code>false</code> otherwise (including when the input
+   *         is not a valid PDF).
    * @throws IOException
    *         on I/O failure reading the source.
    */

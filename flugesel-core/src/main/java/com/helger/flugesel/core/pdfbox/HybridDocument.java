@@ -476,6 +476,7 @@ public final class HybridDocument implements AutoCloseable
    * @return The function response
    * @param <T>
    *        Response document type
+   * @throw {@link IOException} if something goes wrong
    */
   public static <T> T withOpenDocument (@NonNull final IHybridSource aSource,
                                         @NonNull final IHybridDocumentFunction <T> aFn) throws IOException
