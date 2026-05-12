@@ -21,7 +21,7 @@ import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Calendar;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.pdfbox.Loader;
@@ -53,13 +53,14 @@ import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.collection.commons.CommonsArrayList;
+import com.helger.collection.commons.CommonsHashMap;
 import com.helger.collection.commons.ICommonsList;
+import com.helger.collection.commons.ICommonsMap;
 import com.helger.flugesel.model.EAFRelationship;
-import com.helger.flugesel.model.EProfile;
 import com.helger.flugesel.model.EZugferdFlavor;
+import com.helger.flugesel.model.EZugferdProfile;
 import com.helger.flugesel.model.HybridAttachment;
 import com.helger.flugesel.model.HybridMetadata;
-import com.helger.flugesel.source.HybridSource;
 import com.helger.flugesel.source.IHybridSource;
 import com.helger.xml.serialize.read.DOMReader;
 
@@ -99,8 +100,7 @@ public final class HybridDocument implements AutoCloseable
   }
 
   /**
-   * Open a hybrid-invoice PDF. The source is materialised to memory if it is not re-readable, so
-   * that PDFBox can perform random access.
+   * Open a hybrid-invoice PDF.
    *
    * @param aSource
    *        the source. May not be <code>null</code>.
@@ -112,27 +112,22 @@ public final class HybridDocument implements AutoCloseable
   public static HybridDocument open (@NonNull final IHybridSource aSource) throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
-    final IHybridSource aReadable = HybridSource.ensureReadMultiple (aSource);
-    try (final InputStream aIS = aReadable.getInputStream ())
-    {
-      if (aIS == null)
-        throw new IOException ("Could not open input stream for hybrid source");
-      final byte [] aBytes = StreamHelper.getAllBytes (aIS);
-      if (aBytes == null)
-        throw new IOException ("Could not read hybrid source contents");
-      final PDDocument aDoc = Loader.loadPDF (aBytes);
-      return new HybridDocument (aDoc, aReadable);
-    }
+    final PDDocument aDoc = Loader.loadPDF (aSource.getBytes ());
+    return new HybridDocument (aDoc, aSource);
   }
 
-  /** @return the underlying PDFBox document. */
+  /**
+   * @return the underlying PDFBox document.
+   */
   @NonNull
   public PDDocument getPDDocument ()
   {
     return m_aDoc;
   }
 
-  /** @return the source this document was opened from. */
+  /**
+   * @return the source this document was opened from.
+   */
   @NonNull
   public IHybridSource getSource ()
   {
@@ -154,6 +149,81 @@ public final class HybridDocument implements AutoCloseable
     return m_aCachedMetadata;
   }
 
+  /**
+   * Find the file specification that represents the invoice XML attached to the document Catalog's
+   * /AF array, preferring the one whose name matches the XMP <code>fx:DocumentFileName</code>.
+   * Falls back to the default name for the detected flavor, or the first AF entry overall.
+   */
+  @Nullable
+  private static PDComplexFileSpecification _findInvoiceFileSpec (@NonNull final PDDocumentCatalog aCatalog,
+                                                                  @Nullable final String sXmpDocumentFileName,
+                                                                  @Nullable final EZugferdFlavor eFlavor)
+  {
+    final COSDictionary aCatalogDict = aCatalog.getCOSObject ();
+    final COSBase aAFObj = aCatalogDict.getDictionaryObject (COSNAME_AF);
+    if (!(aAFObj instanceof final COSArray aAF))
+      return null;
+
+    PDComplexFileSpecification aMatchByXmp = null;
+    PDComplexFileSpecification aMatchByFlavor = null;
+    PDComplexFileSpecification aFirstSpec = null;
+    for (int i = 0; i < aAF.size (); i++)
+    {
+      final COSBase aItem = aAF.getObject (i);
+      if (!(aItem instanceof final COSDictionary aDict))
+        continue;
+
+      final PDComplexFileSpecification aSpec = new PDComplexFileSpecification (aDict);
+      if (aFirstSpec == null)
+        aFirstSpec = aSpec;
+
+      final String sName = aSpec.getFileUnicode () != null ? aSpec.getFileUnicode () : aSpec.getFile ();
+      if (sName == null)
+        continue;
+
+      if (sXmpDocumentFileName != null && sXmpDocumentFileName.equals (sName))
+      {
+        aMatchByXmp = aSpec;
+        break;
+      }
+      if (eFlavor != null && eFlavor.getDefaultEmbeddedFileName ().equals (sName))
+        aMatchByFlavor = aSpec;
+    }
+
+    // Decide which one to use
+    if (aMatchByXmp != null)
+      return aMatchByXmp;
+    if (aMatchByFlavor != null)
+      return aMatchByFlavor;
+    return aFirstSpec;
+  }
+
+  /**
+   * Scan an XMP DOM for any element or attribute in one of the known flavor namespaces. Collects
+   * the four expected local names from elements and attributes alike (both forms appear in the
+   * spec: element form and attribute form).
+   *
+   * @param aXmpDoc
+   *        XML DOM document
+   * @return Scan result or <code>null</code>.
+   */
+  @Nullable
+  private static ScanResult _scanXmpForFlavor (@NonNull final Document aXmpDoc)
+  {
+    final Element aRoot = aXmpDoc.getDocumentElement ();
+    if (aRoot == null)
+      return null;
+
+    for (final EZugferdFlavor eCandidate : EZugferdFlavor.values ())
+    {
+      final ICommonsMap <String, String> aFields = new CommonsHashMap <> ();
+      _collectFieldsForNamespaceRecursive (aRoot, eCandidate.getNamespaceURI (), aFields);
+      if (aFields.isNotEmpty ())
+        return new ScanResult (eCandidate.getNamespaceURI (), aFields);
+    }
+    return null;
+  }
+
   @NonNull
   private HybridMetadata _doReadMetadata () throws IOException
   {
@@ -162,7 +232,7 @@ public final class HybridDocument implements AutoCloseable
     // ----- XMP -----
     String sNamespaceURI = null;
     EZugferdFlavor eFlavor = null;
-    final Map <String, String> aXmpFields = new HashMap <> ();
+    final ICommonsMap <String, String> aXmpFields = new CommonsHashMap <> ();
     final PDMetadata aMetadata = aCatalog.getMetadata ();
     if (aMetadata != null)
     {
@@ -176,9 +246,9 @@ public final class HybridDocument implements AutoCloseable
           final ScanResult aRes = _scanXmpForFlavor (aXmpDoc);
           if (aRes != null)
           {
-            sNamespaceURI = aRes.namespaceURI;
-            eFlavor = EZugferdFlavor.getFromNamespaceURI (sNamespaceURI);
-            aXmpFields.putAll (aRes.fields);
+            sNamespaceURI = aRes.m_sNamespaceURI;
+            eFlavor = EZugferdFlavor.getFromNamespaceURIOrNull (sNamespaceURI);
+            aXmpFields.putAll (aRes.m_aFields);
           }
         }
         else
@@ -190,7 +260,7 @@ public final class HybridDocument implements AutoCloseable
     final String sXmpDocumentFileName = aXmpFields.get (XMP_DOCUMENT_FILE_NAME);
     final String sXmpVersion = aXmpFields.get (XMP_VERSION);
     final String sRawProfile = aXmpFields.get (XMP_CONFORMANCE_LEVEL);
-    final EProfile eProfile = EProfile.getFromIDOrNull (sRawProfile);
+    final EZugferdProfile eProfile = EZugferdProfile.getFromIDOrNull (sRawProfile);
 
     // ----- Document-level /AF -----
     String sEmbeddedFileName = null;
@@ -199,8 +269,8 @@ public final class HybridDocument implements AutoCloseable
     final PDComplexFileSpecification aInvoiceSpec = _findInvoiceFileSpec (aCatalog, sXmpDocumentFileName, eFlavor);
     if (aInvoiceSpec != null)
     {
-      sEmbeddedFileName = aInvoiceSpec.getFileUnicode () != null ? aInvoiceSpec.getFileUnicode ()
-                                                                 : aInvoiceSpec.getFile ();
+      sEmbeddedFileName = aInvoiceSpec.getFileUnicode () != null ? aInvoiceSpec.getFileUnicode () : aInvoiceSpec
+                                                                                                                .getFile ();
       sRawAFRelationship = aInvoiceSpec.getCOSObject ().getNameAsString (COSNAME_AFRELATIONSHIP);
       eAFRelationship = EAFRelationship.getFromIDOrNull (sRawAFRelationship);
     }
@@ -217,65 +287,23 @@ public final class HybridDocument implements AutoCloseable
                                sRawAFRelationship);
   }
 
-  /**
-   * List every embedded file in the PDF (invoice XML + all supporting attachments).
-   *
-   * @return the attachments. Empty list if the PDF has no embedded files.
-   * @throws IOException
-   *         on parsing failure.
-   */
-  @NonNull
-  @ReturnsMutableCopy
-  public ICommonsList <HybridAttachment> listAttachments () throws IOException
+  private static void _collectAllEmbeddedFilesRecursive (@NonNull final PDNameTreeNode <PDComplexFileSpecification> aNode,
+                                                         @NonNull final ICommonsMap <String, PDComplexFileSpecification> aOut) throws IOException
   {
-    if (m_aCachedAttachments == null)
-      m_aCachedAttachments = _doListAttachments ();
-    return m_aCachedAttachments.getClone ();
+    final Map <String, PDComplexFileSpecification> aDirect = aNode.getNames ();
+    if (aDirect != null)
+      aOut.putAll (aDirect);
+    final List <PDNameTreeNode <PDComplexFileSpecification>> aKids = aNode.getKids ();
+    if (aKids != null)
+      for (final PDNameTreeNode <PDComplexFileSpecification> aKid : aKids)
+        _collectAllEmbeddedFilesRecursive (aKid, aOut);
   }
 
   @NonNull
-  private ICommonsList <HybridAttachment> _doListAttachments () throws IOException
+  private static ICommonsMap <String, PDComplexFileSpecification> _collectAllEmbeddedFiles (@NonNull final PDEmbeddedFilesNameTreeNode aNode) throws IOException
   {
-    final ICommonsList <HybridAttachment> aResult = new CommonsArrayList <> ();
-    final HybridMetadata aMeta = readMetadata ();
-    final String sInvoiceName = aMeta.getEmbeddedFileName ();
-
-    final PDDocumentCatalog aCatalog = m_aDoc.getDocumentCatalog ();
-    final PDDocumentNameDictionary aNames = aCatalog.getNames ();
-    if (aNames == null)
-      return aResult;
-    final PDEmbeddedFilesNameTreeNode aEFTree = aNames.getEmbeddedFiles ();
-    if (aEFTree == null)
-      return aResult;
-
-    final Map <String, PDComplexFileSpecification> aAll = _collectAllEmbeddedFiles (aEFTree);
-    for (final Map.Entry <String, PDComplexFileSpecification> aEntry : aAll.entrySet ())
-    {
-      final String sName = aEntry.getKey ();
-      final PDComplexFileSpecification aSpec = aEntry.getValue ();
-      final PDEmbeddedFile aEF = _pickEmbeddedFileStream (aSpec);
-      if (aEF == null)
-      {
-        LOGGER.warn ("Embedded file '" + sName + "' has no stream");
-        continue;
-      }
-      final byte [] aBytes;
-      try (final InputStream aIS = aEF.createInputStream ())
-      {
-        aBytes = StreamHelper.getAllBytes (aIS);
-      }
-      if (aBytes == null)
-        continue;
-      final String sMime = aEF.getSubtype ();
-      final String sRawRel = aSpec.getCOSObject ().getNameAsString (COSNAME_AFRELATIONSHIP);
-      final EAFRelationship eRel = EAFRelationship.getFromIDOrNull (sRawRel);
-      final Calendar aModCal = aEF.getModDate ();
-      final OffsetDateTime aModDate = aModCal == null ? null
-                                                      : OffsetDateTime.ofInstant (aModCal.toInstant (),
-                                                                                  ZoneOffset.UTC);
-      final boolean bIsInvoice = sInvoiceName != null && sInvoiceName.equals (sName);
-      aResult.add (new HybridAttachment (sName, sMime, eRel, sRawRel, aModDate, aBytes, bIsInvoice));
-    }
+    final ICommonsMap <String, PDComplexFileSpecification> aResult = new CommonsHashMap <> ();
+    _collectAllEmbeddedFilesRecursive (aNode, aResult);
     return aResult;
   }
 
@@ -295,67 +323,70 @@ public final class HybridDocument implements AutoCloseable
   }
 
   @NonNull
-  private static Map <String, PDComplexFileSpecification> _collectAllEmbeddedFiles (@NonNull final PDEmbeddedFilesNameTreeNode aNode) throws IOException
+  private ICommonsList <HybridAttachment> _doListAttachments () throws IOException
   {
-    final Map <String, PDComplexFileSpecification> aResult = new HashMap <> ();
-    _collectAllEmbeddedFilesRecursive (aNode, aResult);
-    return aResult;
-  }
+    final ICommonsList <HybridAttachment> ret = new CommonsArrayList <> ();
+    final HybridMetadata aMeta = readMetadata ();
+    final String sInvoiceName = aMeta.getEmbeddedFileName ();
 
-  private static void _collectAllEmbeddedFilesRecursive (@NonNull final PDNameTreeNode <PDComplexFileSpecification> aNode,
-                                                         @NonNull final Map <String, PDComplexFileSpecification> aOut) throws IOException
-  {
-    final Map <String, PDComplexFileSpecification> aDirect = aNode.getNames ();
-    if (aDirect != null)
-      aOut.putAll (aDirect);
-    final java.util.List <PDNameTreeNode <PDComplexFileSpecification>> aKids = aNode.getKids ();
-    if (aKids != null)
-      for (final PDNameTreeNode <PDComplexFileSpecification> aKid : aKids)
-        _collectAllEmbeddedFilesRecursive (aKid, aOut);
+    final PDDocumentCatalog aCatalog = m_aDoc.getDocumentCatalog ();
+    final PDDocumentNameDictionary aNames = aCatalog.getNames ();
+    if (aNames != null)
+    {
+      final PDEmbeddedFilesNameTreeNode aEFTree = aNames.getEmbeddedFiles ();
+      if (aEFTree != null)
+      {
+        final ICommonsMap <String, PDComplexFileSpecification> aAll = _collectAllEmbeddedFiles (aEFTree);
+        for (final var aEntry : aAll.entrySet ())
+        {
+          final String sName = aEntry.getKey ();
+          final PDComplexFileSpecification aSpec = aEntry.getValue ();
+          final PDEmbeddedFile aEF = _pickEmbeddedFileStream (aSpec);
+          if (aEF == null)
+          {
+            LOGGER.warn ("Embedded file '" + sName + "' has no stream");
+            continue;
+          }
+
+          final byte [] aBytes;
+          try (final InputStream aIS = aEF.createInputStream ())
+          {
+            aBytes = StreamHelper.getAllBytes (aIS);
+          }
+          if (aBytes == null)
+          {
+            LOGGER.warn ("Embedded file '" + sName + "' has no bytes");
+            continue;
+          }
+
+          final String sMime = aEF.getSubtype ();
+          final String sRawRel = aSpec.getCOSObject ().getNameAsString (COSNAME_AFRELATIONSHIP);
+          final EAFRelationship eRel = EAFRelationship.getFromIDOrNull (sRawRel);
+          final Calendar aModCal = aEF.getModDate ();
+          final OffsetDateTime aModDate = aModCal == null ? null : OffsetDateTime.ofInstant (aModCal.toInstant (),
+                                                                                             ZoneOffset.UTC);
+          final boolean bIsInvoice = sInvoiceName != null && sInvoiceName.equals (sName);
+          ret.add (new HybridAttachment (sName, sMime, eRel, sRawRel, aModDate, aBytes, bIsInvoice));
+        }
+      }
+    }
+    return ret;
   }
 
   /**
-   * Find the file specification that represents the invoice XML attached to the document
-   * Catalog's /AF array, preferring the one whose name matches the XMP <code>fx:DocumentFileName</code>.
-   * Falls back to the default name for the detected flavor, or the first AF entry overall.
+   * List every embedded file in the PDF (invoice XML + all supporting attachments).
+   *
+   * @return the attachments. Empty list if the PDF has no embedded files.
+   * @throws IOException
+   *         on parsing failure.
    */
-  @Nullable
-  private static PDComplexFileSpecification _findInvoiceFileSpec (@NonNull final PDDocumentCatalog aCatalog,
-                                                                  @Nullable final String sXmpDocumentFileName,
-                                                                  @Nullable final EZugferdFlavor eFlavor)
+  @NonNull
+  @ReturnsMutableCopy
+  public ICommonsList <HybridAttachment> listAttachments () throws IOException
   {
-    final COSDictionary aCatalogDict = aCatalog.getCOSObject ();
-    final COSBase aAFObj = aCatalogDict.getDictionaryObject (COSNAME_AF);
-    if (!(aAFObj instanceof COSArray))
-      return null;
-    final COSArray aAF = (COSArray) aAFObj;
-    PDComplexFileSpecification aMatchByXmp = null;
-    PDComplexFileSpecification aMatchByFlavor = null;
-    PDComplexFileSpecification aFirst = null;
-    for (int i = 0; i < aAF.size (); i++)
-    {
-      final COSBase aItem = aAF.getObject (i);
-      if (!(aItem instanceof COSDictionary))
-        continue;
-      final PDComplexFileSpecification aSpec = new PDComplexFileSpecification ((COSDictionary) aItem);
-      if (aFirst == null)
-        aFirst = aSpec;
-      final String sName = aSpec.getFileUnicode () != null ? aSpec.getFileUnicode () : aSpec.getFile ();
-      if (sName == null)
-        continue;
-      if (sXmpDocumentFileName != null && sXmpDocumentFileName.equals (sName))
-      {
-        aMatchByXmp = aSpec;
-        break;
-      }
-      if (eFlavor != null && eFlavor.getDefaultEmbeddedFileName ().equals (sName))
-        aMatchByFlavor = aSpec;
-    }
-    if (aMatchByXmp != null)
-      return aMatchByXmp;
-    if (aMatchByFlavor != null)
-      return aMatchByFlavor;
-    return aFirst;
+    if (m_aCachedAttachments == null)
+      m_aCachedAttachments = _doListAttachments ();
+    return m_aCachedAttachments.getClone ();
   }
 
   // ---------------- XMP DOM scanning ----------------
@@ -363,44 +394,32 @@ public final class HybridDocument implements AutoCloseable
   /** Result of scanning an XMP DOM for a recognised flavor namespace. */
   private static final class ScanResult
   {
-    final String namespaceURI;
-    final Map <String, String> fields;
+    final String m_sNamespaceURI;
+    final ICommonsMap <String, String> m_aFields;
 
-    ScanResult (final String sNamespaceURI, final Map <String, String> aFields)
+    ScanResult (final String sNamespaceURI, final ICommonsMap <String, String> aFields)
     {
-      namespaceURI = sNamespaceURI;
-      fields = aFields;
+      m_sNamespaceURI = sNamespaceURI;
+      m_aFields = aFields;
     }
   }
 
-  /**
-   * Scan an XMP DOM for any element or attribute in one of the known flavor namespaces. Collects
-   * the four expected local names from elements and attributes alike (both forms appear in the
-   * spec: element form and attribute form).
-   */
-  @Nullable
-  private static ScanResult _scanXmpForFlavor (@NonNull final Document aXmpDoc)
+  private static boolean _isInterestingLocalName (@NonNull final String sLocalName)
   {
-    final Element aRoot = aXmpDoc.getDocumentElement ();
-    if (aRoot == null)
-      return null;
-    for (final EZugferdFlavor eCandidate : EZugferdFlavor.values ())
-    {
-      final Map <String, String> aFields = new HashMap <> ();
-      _collectFieldsForNamespace (aRoot, eCandidate.getNamespaceURI (), aFields);
-      if (!aFields.isEmpty ())
-        return new ScanResult (eCandidate.getNamespaceURI (), aFields);
-    }
-    return null;
+    return XMP_DOCUMENT_TYPE.equals (sLocalName) ||
+           XMP_DOCUMENT_FILE_NAME.equals (sLocalName) ||
+           XMP_VERSION.equals (sLocalName) ||
+           XMP_CONFORMANCE_LEVEL.equals (sLocalName);
   }
 
-  private static void _collectFieldsForNamespace (@NonNull final Node aNode,
-                                                  @NonNull final String sNsURI,
-                                                  @NonNull final Map <String, String> aOut)
+  private static void _collectFieldsForNamespaceRecursive (@NonNull final Node aNode,
+                                                           @NonNull final String sNsURI,
+                                                           @NonNull final Map <String, String> aOut)
   {
     if (aNode.getNodeType () == Node.ELEMENT_NODE)
     {
       final Element aEl = (Element) aNode;
+
       // Attribute-form: <rdf:Description fx:DocumentType="INVOICE" .../>
       final NamedNodeMap aAttrs = aEl.getAttributes ();
       if (aAttrs != null)
@@ -410,15 +429,16 @@ public final class HybridDocument implements AutoCloseable
           if (sNsURI.equals (aAttr.getNamespaceURI ()))
           {
             final String sLocal = aAttr.getLocalName ();
-            if (sLocal != null && _isInteresting (sLocal))
+            if (sLocal != null && _isInterestingLocalName (sLocal))
               aOut.put (sLocal, aAttr.getValue ());
           }
         }
+
       // Element-form: <fx:DocumentType>INVOICE</fx:DocumentType>
       if (sNsURI.equals (aEl.getNamespaceURI ()))
       {
         final String sLocal = aEl.getLocalName ();
-        if (sLocal != null && _isInteresting (sLocal))
+        if (sLocal != null && _isInterestingLocalName (sLocal))
         {
           final String sValue = aEl.getTextContent ();
           if (sValue != null)
@@ -426,17 +446,10 @@ public final class HybridDocument implements AutoCloseable
         }
       }
     }
+
     final NodeList aKids = aNode.getChildNodes ();
     for (int i = 0; i < aKids.getLength (); i++)
-      _collectFieldsForNamespace (aKids.item (i), sNsURI, aOut);
-  }
-
-  private static boolean _isInteresting (@NonNull final String sLocalName)
-  {
-    return XMP_DOCUMENT_TYPE.equals (sLocalName) ||
-           XMP_DOCUMENT_FILE_NAME.equals (sLocalName) ||
-           XMP_VERSION.equals (sLocalName) ||
-           XMP_CONFORMANCE_LEVEL.equals (sLocalName);
+      _collectFieldsForNamespaceRecursive (aKids.item (i), sNsURI, aOut);
   }
 
   @Override
@@ -453,7 +466,17 @@ public final class HybridDocument implements AutoCloseable
     }
   }
 
-  /** Open, run a function, close. Convenience for one-shot operations. */
+  /**
+   * Open, run a function, close. Convenience for one-shot operations.
+   *
+   * @param aSource
+   *        Source
+   * @param aFn
+   *        Function to run
+   * @return The function response
+   * @param <T>
+   *        Response document type
+   */
   public static <T> T withOpenDocument (@NonNull final IHybridSource aSource,
                                         @NonNull final IHybridDocumentFunction <T> aFn) throws IOException
   {
@@ -461,13 +484,5 @@ public final class HybridDocument implements AutoCloseable
     {
       return aFn.apply (aDoc);
     }
-  }
-
-  /** Functional interface for {@link #withOpenDocument(IHybridSource, IHybridDocumentFunction)}. */
-  @FunctionalInterface
-  public interface IHybridDocumentFunction <T>
-  {
-    @Nullable
-    T apply (@NonNull HybridDocument aDoc) throws IOException;
   }
 }

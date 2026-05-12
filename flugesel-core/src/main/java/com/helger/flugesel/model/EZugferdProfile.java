@@ -19,13 +19,15 @@ package com.helger.flugesel.model;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import com.helger.base.id.IHasID;
+
 /**
  * Hybrid invoice profile, read from the XMP <code>fx:ConformanceLevel</code> /
  * <code>zf:ConformanceLevel</code> property.
  *
  * @author Philip Helger
  */
-public enum EProfile
+public enum EZugferdProfile implements IHasID <String>
 {
   /** ZUGFeRD 2.0.1+ / Factur-X. Booking aid only; no invoice lines. */
   MINIMUM ("MINIMUM"),
@@ -44,7 +46,7 @@ public enum EProfile
 
   private final String m_sID;
 
-  EProfile (final String sID)
+  EZugferdProfile (final String sID)
   {
     m_sID = sID;
   }
@@ -69,22 +71,25 @@ public enum EProfile
    * @return the profile or <code>null</code> if not recognised.
    */
   @Nullable
-  public static EProfile getFromIDOrNull (@Nullable final String sID)
+  public static EZugferdProfile getFromIDOrNull (@Nullable final String sID)
   {
-    if (sID == null)
-      return null;
-    for (final EProfile e : values ())
-      if (e.m_sID.equals (sID))
-        return e;
-    // Case-insensitive fallback
-    for (final EProfile e : values ())
-      if (e.m_sID.equalsIgnoreCase (sID))
-        return e;
-    // Whitespace-removed fallback ("EN16931" → "EN 16931")
-    final String sStripped = sID.replace (" ", "").replace ("_", "");
-    for (final EProfile e : values ())
-      if (e.m_sID.replace (" ", "").equalsIgnoreCase (sStripped))
-        return e;
+    if (sID != null)
+    {
+      for (final EZugferdProfile e : values ())
+        if (e.m_sID.equals (sID))
+          return e;
+
+      // Case-insensitive fallback
+      for (final EZugferdProfile e : values ())
+        if (e.m_sID.equalsIgnoreCase (sID))
+          return e;
+
+      // Whitespace-removed fallback ("EN16931" → "EN 16931")
+      final String sStripped = sID.replace (" ", "").replace ("_", "");
+      for (final EZugferdProfile e : values ())
+        if (e.m_sID.replace (" ", "").equalsIgnoreCase (sStripped))
+          return e;
+    }
     return null;
   }
 }

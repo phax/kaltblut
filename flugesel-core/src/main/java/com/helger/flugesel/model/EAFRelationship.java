@@ -19,19 +19,25 @@ package com.helger.flugesel.model;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import com.helger.base.id.IHasID;
+import com.helger.base.lang.EnumHelper;
+
 /**
- * PDF/A-3 <code>AFRelationship</code> values as used by ZUGFeRD / Factur-X for the embedded
- * invoice XML.
+ * PDF/A-3 <code>AFRelationship</code> values as used by ZUGFeRD / Factur-X for the embedded invoice
+ * XML.
  *
  * @author Philip Helger
  */
-public enum EAFRelationship
+public enum EAFRelationship implements IHasID <String>
 {
   /** XML carries data behind the visual rendering (used for MINIMUM / BASIC WL). */
   DATA ("Data"),
   /** PDF was rendered from the XML; XML is the authoritative source. */
   SOURCE ("Source"),
-  /** PDF and XML are equivalent representations (required in Germany for BASIC, EN 16931, EXTENDED, XRECHNUNG). */
+  /**
+   * PDF and XML are equivalent representations (required in Germany for BASIC, EN 16931, EXTENDED,
+   * XRECHNUNG).
+   */
   ALTERNATIVE ("Alternative"),
   /** Additional information, neither source nor alternative. */
   SUPPLEMENT ("Supplement"),
@@ -54,11 +60,6 @@ public enum EAFRelationship
   @Nullable
   public static EAFRelationship getFromIDOrNull (@Nullable final String sID)
   {
-    if (sID == null)
-      return null;
-    for (final EAFRelationship e : values ())
-      if (e.m_sID.equalsIgnoreCase (sID))
-        return e;
-    return null;
+    return EnumHelper.getFromIDCaseInsensitiveOrNull (EAFRelationship.class, sID);
   }
 }

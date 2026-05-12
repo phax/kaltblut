@@ -23,16 +23,12 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.base.enforce.ValueEnforcer;
-import com.helger.base.io.nonblocking.NonBlockingByteArrayInputStream;
 import com.helger.base.io.stream.StreamHelper;
 
 /**
@@ -43,29 +39,27 @@ import com.helger.base.io.stream.StreamHelper;
 @Immutable
 public final class HybridSource
 {
-  private static final Logger LOGGER = LoggerFactory.getLogger (HybridSource.class);
-
   private HybridSource ()
   {}
 
   /**
-   * Create a re-readable source backed by a byte array. The array is referenced, not copied;
-   * callers must not mutate it.
+   * Create a source backed by a byte array. The array is referenced, not copied; callers must not
+   * mutate it.
    *
    * @param aBytes
    *        the bytes of the PDF. May not be <code>null</code>.
-   * @return a re-readable hybrid source.
+   * @return a hybrid source.
    */
   @NonNull
   public static IHybridSource fromBytes (@NonNull final byte [] aBytes)
   {
     ValueEnforcer.notNull (aBytes, "Bytes");
-    return fromBytes (aBytes, 0, aBytes.length);
+    return new EagerBytesHybridSource (aBytes, null);
   }
 
   /**
-   * Create a re-readable source backed by a slice of a byte array. The array is referenced, not
-   * copied; callers must not mutate it.
+   * Create a source backed by a slice of a byte array. The slice is copied into a fresh array so
+   * that subsequent mutation of the source array is not observed by this source.
    *
    * @param aBytes
    *        the bytes of the PDF. May not be <code>null</code>.
@@ -73,80 +67,75 @@ public final class HybridSource
    *        offset into <code>aBytes</code>.
    * @param nLen
    *        number of bytes to read.
-   * @return a re-readable hybrid source.
+   * @return a hybrid source.
    */
   @NonNull
   public static IHybridSource fromBytes (@NonNull final byte [] aBytes, final int nOfs, final int nLen)
   {
     ValueEnforcer.notNull (aBytes, "Bytes");
     ValueEnforcer.isArrayOfsLen (aBytes, nOfs, nLen);
-    return new ByteArrayHybridSource (aBytes, nOfs, nLen, null);
+    final byte [] aCopy = new byte [nLen];
+    System.arraycopy (aBytes, nOfs, aCopy, 0, nLen);
+    return new EagerBytesHybridSource (aCopy, null);
   }
 
   /**
-   * Create a re-readable source backed by a {@link ByteBuffer}. The buffer contents from
-   * <code>position()</code> to <code>limit()</code> at the time of this call are captured by
-   * reference into a byte array if the buffer is non-direct and has an accessible array;
-   * otherwise the contents are copied.
+   * Create a source backed by a {@link ByteBuffer}. The buffer's content from
+   * <code>position()</code> to <code>limit()</code> at the time of this call is captured into a
+   * fresh array.
    *
    * @param aBuffer
    *        the byte buffer. May not be <code>null</code>.
-   * @return a re-readable hybrid source.
+   * @return a hybrid source.
    */
   @NonNull
   public static IHybridSource fromByteBuffer (@NonNull final ByteBuffer aBuffer)
   {
     ValueEnforcer.notNull (aBuffer, "Buffer");
-    final int nRemaining = aBuffer.remaining ();
-    if (aBuffer.hasArray () && !aBuffer.isReadOnly ())
-    {
-      final byte [] aArr = aBuffer.array ();
-      final int nOfs = aBuffer.arrayOffset () + aBuffer.position ();
-      return new ByteArrayHybridSource (aArr, nOfs, nRemaining, null);
-    }
-    final byte [] aCopy = new byte [nRemaining];
+    final byte [] aCopy = new byte [aBuffer.remaining ()];
     final int nPos = aBuffer.position ();
     aBuffer.get (aCopy);
     aBuffer.position (nPos);
-    return new ByteArrayHybridSource (aCopy, 0, nRemaining, null);
+    return new EagerBytesHybridSource (aCopy, null);
   }
 
   /**
-   * Create a re-readable source backed by a file.
+   * Create a source backed by a file. Bytes are read lazily on the first call to
+   * {@link IHybridSource#getBytes()} and cached afterwards.
    *
    * @param aFile
    *        the file. May not be <code>null</code>.
-   * @return a re-readable hybrid source.
+   * @return a hybrid source.
    */
   @NonNull
   public static IHybridSource fromFile (@NonNull final File aFile)
   {
     ValueEnforcer.notNull (aFile, "File");
-    return new FileHybridSource (aFile.toPath ());
+    return new PathHybridSource (aFile.toPath ());
   }
 
   /**
-   * Create a re-readable source backed by a path.
+   * Create a source backed by a path. Bytes are read lazily on the first call to
+   * {@link IHybridSource#getBytes()} and cached afterwards.
    *
    * @param aPath
    *        the path. May not be <code>null</code>.
-   * @return a re-readable hybrid source.
+   * @return a hybrid source.
    */
   @NonNull
   public static IHybridSource fromPath (@NonNull final Path aPath)
   {
     ValueEnforcer.notNull (aPath, "Path");
-    return new FileHybridSource (aPath);
+    return new PathHybridSource (aPath);
   }
 
   /**
-   * Create a re-readable source backed by a URL. The URL is re-opened on each input stream
-   * acquisition; callers should prefer {@link #fromBytes} or {@link #fromFile} for repeated
-   * access if the resource is large.
+   * Create a source backed by a URL. Bytes are read lazily on the first call to
+   * {@link IHybridSource#getBytes()} and cached afterwards.
    *
    * @param aUrl
    *        the URL. May not be <code>null</code>.
-   * @return a re-readable hybrid source.
+   * @return a hybrid source.
    */
   @NonNull
   public static IHybridSource fromUrl (@NonNull final URL aUrl)
@@ -156,32 +145,34 @@ public final class HybridSource
   }
 
   /**
-   * Create a single-read source from an {@link InputStream}. The stream is consumed on the first
-   * call to {@link IHybridSource#getInputStream()}; subsequent calls return <code>null</code>.
-   * The caller is responsible for closing the returned stream, but the stream returned will be
-   * the original stream.
+   * Read an {@link InputStream} fully and create an in-memory hybrid source. The stream is closed
+   * after reading.
    *
    * @param aIS
    *        the input stream. May not be <code>null</code>.
-   * @return a single-read hybrid source.
+   * @return a hybrid source.
+   * @throws IOException
+   *         if reading from the stream failed.
    */
   @NonNull
-  public static IHybridSource fromInputStreamOnce (@NonNull final InputStream aIS)
+  public static IHybridSource fromInputStream (@NonNull final InputStream aIS) throws IOException
   {
     ValueEnforcer.notNull (aIS, "InputStream");
-    return new SingleReadInputStreamHybridSource (aIS);
+    final byte [] aBytes = StreamHelper.getAllBytes (aIS);
+    if (aBytes == null)
+      throw new IOException ("Failed to read input stream into byte array");
+    return new EagerBytesHybridSource (aBytes, null);
   }
 
   /**
-   * Create a re-readable source from a classpath resource. The resource is resolved via the given
-   * class's {@link Class#getResourceAsStream(String)}, which honours classloader scoping. The
-   * stream contents are materialised eagerly to memory.
+   * Create a source from a classpath resource resolved via the given class's classloader. Bytes
+   * are read eagerly.
    *
    * @param sResourcePath
-   *        the resource path, absolute (starting with {@code /}) or relative to the loader class.
+   *        the resource path. Absolute (starting with {@code /}) or relative to the loader class.
    * @param aLoader
    *        the class whose classloader is used. May not be <code>null</code>.
-   * @return a re-readable hybrid source.
+   * @return a hybrid source.
    * @throws IOException
    *         if the resource is not found or cannot be read.
    */
@@ -198,17 +189,17 @@ public final class HybridSource
       final byte [] aBytes = StreamHelper.getAllBytes (aIS);
       if (aBytes == null)
         throw new IOException ("Failed to read classpath resource: " + sResourcePath);
-      return new ByteArrayHybridSource (aBytes, 0, aBytes.length, sResourcePath);
+      return new EagerBytesHybridSource (aBytes, sResourcePath);
     }
   }
 
   /**
-   * Create a re-readable source from a classpath resource resolved via the current thread's
-   * context classloader (falling back to the class loader of this class).
+   * Create a source from a classpath resource resolved via the current thread's context
+   * classloader (falling back to the class loader of this class). Bytes are read eagerly.
    *
    * @param sResourcePath
    *        the resource path (must not start with {@code /}).
-   * @return a re-readable hybrid source.
+   * @return a hybrid source.
    * @throws IOException
    *         if the resource is not found or cannot be read.
    */
@@ -226,63 +217,35 @@ public final class HybridSource
       final byte [] aBytes = StreamHelper.getAllBytes (aIS);
       if (aBytes == null)
         throw new IOException ("Failed to read classpath resource: " + sResourcePath);
-      return new ByteArrayHybridSource (aBytes, 0, aBytes.length, sResourcePath);
+      return new EagerBytesHybridSource (aBytes, sResourcePath);
     }
-  }
-
-  /**
-   * Materialize an {@link InputStream} into a re-readable in-memory byte array source. The input
-   * stream is closed after reading.
-   *
-   * @param aIS
-   *        the input stream. May not be <code>null</code>.
-   * @return a re-readable hybrid source.
-   * @throws IOException
-   *         if reading from the stream failed.
-   */
-  @NonNull
-  public static IHybridSource materialize (@NonNull final InputStream aIS) throws IOException
-  {
-    ValueEnforcer.notNull (aIS, "InputStream");
-    final byte [] aBytes = StreamHelper.getAllBytes (aIS);
-    if (aBytes == null)
-      throw new IOException ("Failed to read input stream into byte array");
-    return new ByteArrayHybridSource (aBytes, 0, aBytes.length, null);
   }
 
   // ----- internal implementations -----
 
-  private static final class ByteArrayHybridSource implements IHybridSource
+  /** In-memory eager source. */
+  private static final class EagerBytesHybridSource implements IHybridSource
   {
     private final byte [] m_aBytes;
-    private final int m_nOfs;
-    private final int m_nLen;
     private final String m_sName;
 
-    ByteArrayHybridSource (final byte [] aBytes, final int nOfs, final int nLen, @Nullable final String sName)
+    EagerBytesHybridSource (@NonNull final byte [] aBytes, @Nullable final String sName)
     {
       m_aBytes = aBytes;
-      m_nOfs = nOfs;
-      m_nLen = nLen;
       m_sName = sName;
     }
 
     @Override
-    public InputStream getInputStream ()
+    @NonNull
+    public byte [] getBytes ()
     {
-      return new NonBlockingByteArrayInputStream (m_aBytes, m_nOfs, m_nLen);
-    }
-
-    @Override
-    public boolean isReadMultiple ()
-    {
-      return true;
+      return m_aBytes;
     }
 
     @Override
     public long getSize ()
     {
-      return m_nLen;
+      return m_aBytes.length;
     }
 
     @Override
@@ -293,39 +256,31 @@ public final class HybridSource
     }
   }
 
-  private static final class FileHybridSource implements IHybridSource
+  /** Lazy file/path source with one-shot caching. */
+  private static final class PathHybridSource implements IHybridSource
   {
     private final Path m_aPath;
+    private byte [] m_aCached;
 
-    FileHybridSource (final Path aPath)
+    PathHybridSource (@NonNull final Path aPath)
     {
       m_aPath = aPath;
     }
 
     @Override
-    @Nullable
-    public InputStream getInputStream ()
+    @NonNull
+    public synchronized byte [] getBytes () throws IOException
     {
-      try
-      {
-        return Files.newInputStream (m_aPath);
-      }
-      catch (final IOException ex)
-      {
-        LOGGER.warn ("Failed to open file '" + m_aPath + "' for reading", ex);
-        return null;
-      }
-    }
-
-    @Override
-    public boolean isReadMultiple ()
-    {
-      return true;
+      if (m_aCached == null)
+        m_aCached = Files.readAllBytes (m_aPath);
+      return m_aCached;
     }
 
     @Override
     public long getSize ()
     {
+      if (m_aCached != null)
+        return m_aCached.length;
       try
       {
         return Files.size (m_aPath);
@@ -343,42 +298,34 @@ public final class HybridSource
       final Path aFile = m_aPath.getFileName ();
       return aFile == null ? m_aPath.toString () : aFile.toString ();
     }
-
-    @Nullable
-    Path getPath ()
-    {
-      return m_aPath;
-    }
   }
 
+  /** Lazy URL source with one-shot caching. */
   private static final class UrlHybridSource implements IHybridSource
   {
     private final URL m_aUrl;
+    private byte [] m_aCached;
 
-    UrlHybridSource (final URL aUrl)
+    UrlHybridSource (@NonNull final URL aUrl)
     {
       m_aUrl = aUrl;
     }
 
     @Override
-    @Nullable
-    public InputStream getInputStream ()
+    @NonNull
+    public synchronized byte [] getBytes () throws IOException
     {
-      try
+      if (m_aCached == null)
       {
-        return m_aUrl.openStream ();
+        try (final InputStream aIS = m_aUrl.openStream ())
+        {
+          final byte [] aBytes = StreamHelper.getAllBytes (aIS);
+          if (aBytes == null)
+            throw new IOException ("Failed to read URL " + m_aUrl);
+          m_aCached = aBytes;
+        }
       }
-      catch (final IOException ex)
-      {
-        LOGGER.warn ("Failed to open URL '" + m_aUrl + "' for reading", ex);
-        return null;
-      }
-    }
-
-    @Override
-    public boolean isReadMultiple ()
-    {
-      return true;
+      return m_aCached;
     }
 
     @Override
@@ -386,57 +333,6 @@ public final class HybridSource
     public String getName ()
     {
       return m_aUrl.toString ();
-    }
-  }
-
-  private static final class SingleReadInputStreamHybridSource implements IHybridSource
-  {
-    private final InputStream m_aIS;
-    private final AtomicBoolean m_aConsumed = new AtomicBoolean (false);
-
-    SingleReadInputStreamHybridSource (final InputStream aIS)
-    {
-      m_aIS = aIS;
-    }
-
-    @Override
-    @Nullable
-    public InputStream getInputStream ()
-    {
-      if (m_aConsumed.compareAndSet (false, true))
-        return m_aIS;
-      LOGGER.warn ("Single-read hybrid source has already been consumed");
-      return null;
-    }
-
-    @Override
-    public boolean isReadMultiple ()
-    {
-      return false;
-    }
-  }
-
-  /**
-   * If the supplied source is re-readable, return it as-is. Otherwise, drain it to memory and
-   * return a re-readable copy.
-   *
-   * @param aSource
-   *        the source. May not be <code>null</code>.
-   * @return a re-readable equivalent of <code>aSource</code>.
-   * @throws IOException
-   *         if draining a single-read source failed.
-   */
-  @NonNull
-  public static IHybridSource ensureReadMultiple (@NonNull final IHybridSource aSource) throws IOException
-  {
-    ValueEnforcer.notNull (aSource, "Source");
-    if (aSource.isReadMultiple ())
-      return aSource;
-    try (final InputStream aIS = aSource.getInputStream ())
-    {
-      if (aIS == null)
-        throw new IOException ("Source already consumed");
-      return materialize (aIS);
     }
   }
 }

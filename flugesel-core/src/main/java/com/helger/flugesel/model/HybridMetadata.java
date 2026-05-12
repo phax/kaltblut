@@ -42,7 +42,7 @@ public final class HybridMetadata
   private final String m_sXmpDocumentType;
   private final String m_sXmpDocumentFileName;
   private final String m_sXmpVersion;
-  private final EProfile m_eProfile;
+  private final EZugferdProfile m_eProfile;
   private final String m_sRawProfile;
   private final String m_sEmbeddedFileName;
   private final EAFRelationship m_eAFRelationship;
@@ -53,7 +53,7 @@ public final class HybridMetadata
                          @Nullable final String sXmpDocumentType,
                          @Nullable final String sXmpDocumentFileName,
                          @Nullable final String sXmpVersion,
-                         @Nullable final EProfile eProfile,
+                         @Nullable final EZugferdProfile eProfile,
                          @Nullable final String sRawProfile,
                          @Nullable final String sEmbeddedFileName,
                          @Nullable final EAFRelationship eAFRelationship,
@@ -108,7 +108,7 @@ public final class HybridMetadata
 
   /** @return the resolved profile, or <code>null</code> if not recognised. */
   @Nullable
-  public EProfile getProfile ()
+  public EZugferdProfile getProfile ()
   {
     return m_eProfile;
   }

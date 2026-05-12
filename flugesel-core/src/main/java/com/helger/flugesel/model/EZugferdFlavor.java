@@ -22,9 +22,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * Identifies which XMP extension-schema namespace a hybrid invoice declares.
  * <p>
- * The namespace URI is the most reliable fingerprint for distinguishing ZUGFeRD / Factur-X
- * spec generations. The five URIs in this enum cover every release from ZUGFeRD 1.0 (2014)
- * through Factur-X 1.08 / ZUGFeRD 2.4 (2025-12-04).
+ * The namespace URI is the most reliable fingerprint for distinguishing ZUGFeRD / Factur-X spec
+ * generations. The five URIs in this enum cover every release from ZUGFeRD 1.0 (2014) through
+ * Factur-X 1.08 / ZUGFeRD 2.4 (2025-12-04).
  *
  * @author Philip Helger
  */
@@ -44,8 +44,8 @@ public enum EZugferdFlavor
 
   /**
    * Factur-X primary namespace. Used from ZUGFeRD 2.1 (Supplement A) onward as the preferred
-   * identifier. Embedded XML named <code>factur-x.xml</code> (or <code>xrechnung.xml</code> for
-   * the XRECHNUNG reference profile).
+   * identifier. Embedded XML named <code>factur-x.xml</code> (or <code>xrechnung.xml</code> for the
+   * XRECHNUNG reference profile).
    */
   FACTURX_PRIMARY ("urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#", "fx", "factur-x.xml"),
 
@@ -56,8 +56,8 @@ public enum EZugferdFlavor
   ZUGFERD_2_2_LEGACY ("urn:zugferd:pdfa:CrossIndustryDocument:invoice:1p0#", "zf", "zugferd-invoice.xml"),
 
   /**
-   * BR-HYBRID-04 wording from spec 2.3.2 onward. Apparent transcription error vs §6.3.1
-   * (missing <code>:invoice</code> segment). Treated as a recognised but irregular variant.
+   * BR-HYBRID-04 wording from spec 2.3.2 onward. Apparent transcription error vs §6.3.1 (missing
+   * <code>:invoice</code> segment). Treated as a recognised but irregular variant.
    */
   FACTURX_BR_HYBRID_04 ("urn:factur-x:pdfa:CrossIndustryDocument:1p0#", "fx", "factur-x.xml");
 
@@ -93,8 +93,8 @@ public enum EZugferdFlavor
   }
 
   /**
-   * @return the default embedded XML file name for this flavor. For Factur-X primary the
-   *         XRECHNUNG profile overrides this to <code>xrechnung.xml</code>.
+   * @return the default embedded XML file name for this flavor. For Factur-X primary the XRECHNUNG
+   *         profile overrides this to <code>xrechnung.xml</code>.
    */
   @NonNull
   public String getDefaultEmbeddedFileName ()
@@ -110,13 +110,12 @@ public enum EZugferdFlavor
    * @return the flavor or <code>null</code> if no known flavor matches.
    */
   @Nullable
-  public static EZugferdFlavor getFromNamespaceURI (@Nullable final String sNamespaceURI)
+  public static EZugferdFlavor getFromNamespaceURIOrNull (@Nullable final String sNamespaceURI)
   {
-    if (sNamespaceURI == null)
-      return null;
-    for (final EZugferdFlavor e : values ())
-      if (e.m_sNamespaceURI.equals (sNamespaceURI))
-        return e;
+    if (sNamespaceURI != null)
+      for (final EZugferdFlavor e : values ())
+        if (e.m_sNamespaceURI.equals (sNamespaceURI))
+          return e;
     return null;
   }
 }

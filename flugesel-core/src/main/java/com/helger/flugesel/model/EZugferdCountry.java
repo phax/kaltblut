@@ -22,7 +22,7 @@ package com.helger.flugesel.model;
  *
  * @author Philip Helger
  */
-public enum ECountry
+public enum EZugferdCountry
 {
   /** Germany. Activates BR-HYBRID-DE-* and BR-FX-DE-* rules and the PDF/A-3 error downgrade. */
   DE,

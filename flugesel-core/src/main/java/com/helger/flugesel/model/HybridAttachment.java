@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.tostring.ToStringGenerator;
 
 /**
  * Description of one embedded file inside a hybrid PDF (the invoice XML or any supporting
@@ -115,16 +116,13 @@ public final class HybridAttachment
   @NonNull
   public String toString ()
   {
-    return "HybridAttachment[name=" +
-           m_sName +
-           ", mime=" +
-           m_sMimeType +
-           ", size=" +
-           m_aBytes.length +
-           ", afRelationship=" +
-           m_eAFRelationship +
-           ", invoice=" +
-           m_bIsInvoiceXml +
-           "]";
+    return new ToStringGenerator (null).append ("Name", m_sName)
+                                       .append ("MimeType", m_sMimeType)
+                                       .append ("AFRelationship", m_eAFRelationship)
+                                       .append ("RawAFRelationship", m_sRawAFRelationship)
+                                       .append ("ModDate", m_aModDate)
+                                       .append ("Size", m_aBytes.length)
+                                       .append ("IsInvoiceXml", m_bIsInvoiceXml)
+                                       .getToString ();
   }
 }

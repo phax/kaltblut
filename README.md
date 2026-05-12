@@ -58,33 +58,29 @@ All public entry points take a source. Use one of the `HybridSource` factories:
 import com.helger.flugesel.source.HybridSource;
 import com.helger.flugesel.source.IHybridSource;
 
-IHybridSource s1 = HybridSource.fromFile (new File ("invoice.pdf"));
-IHybridSource s2 = HybridSource.fromPath (Path.of ("invoice.pdf"));
-IHybridSource s3 = HybridSource.fromBytes (aPdfBytes);
-IHybridSource s4 = HybridSource.fromByteBuffer (aBuffer);
+IHybridSource s1 = HybridSource.fromFile (new File ("invoice.pdf"));         // lazy + cached
+IHybridSource s2 = HybridSource.fromPath (Path.of ("invoice.pdf"));          // lazy + cached
+IHybridSource s3 = HybridSource.fromBytes (aPdfBytes);                       // wraps array
+IHybridSource s4 = HybridSource.fromByteBuffer (aBuffer);                    // copies
 IHybridSource s5 = HybridSource.fromUrl (new URL ("https://example.com/invoice.pdf"));
-
-// Single-read: the InputStream is consumed once and then the source is exhausted.
-IHybridSource s6 = HybridSource.fromInputStreamOnce (aIS);
-
-// Materialise a single-read stream up front so it can be passed to multiple flugesel ops.
-IHybridSource s7 = HybridSource.materialize (aIS);
+IHybridSource s6 = HybridSource.fromInputStream (aIS);                       // reads now, closes
+IHybridSource s7 = HybridSource.fromClasspath ("samples/invoice.pdf");       // resource path
 ```
 
-`IHybridSource` extends `com.helger.base.io.iface.IHasInputStream`, so any existing
-`IHasInputStream` can be used wherever an `IHybridSource` is expected by adapting it through a
-factory, and `source.isReadMultiple()` tells you whether it is re-readable. Operations that need
-to read the PDF more than once internally use `HybridSource.ensureReadMultiple(...)` to upgrade a
-single-read source to an in-memory byte array when necessary.
+`IHybridSource` is byte-array-centric: the contract is `byte[] getBytes() throws IOException`,
+plus `long getSize()` and `String getName()` as diagnostic hints. PDFBox 3 needs random access
+and every flugesel operation eventually needs the complete PDF in memory, so distinguishing
+single-read from multi-read inputs added API surface without value. Implementations may read
+lazily on first call and cache the result; callers must not mutate the returned array.
 
 ### Model
 
 The model classes in `com.helger.flugesel.model` are immutable value objects:
 
 - `EZugferdFlavor` — namespace-URI fingerprint of the spec generation.
-- `EProfile` — `MINIMUM`, `BASIC_WL`, `BASIC`, `COMFORT`, `EN_16931`, `EXTENDED`, `XRECHNUNG`.
+- `EZugferdProfile` — `MINIMUM`, `BASIC_WL`, `BASIC`, `COMFORT`, `EN_16931`, `EXTENDED`, `XRECHNUNG`.
 - `EAFRelationship` — `Data`, `Source`, `Alternative`, `Supplement`, `Unspecified`.
-- `ECountry` — `DE`, `FR`, `OTHER` (drives country-specific rules).
+- `EZugferdCountry` — `DE`, `FR`, `OTHER` (drives country-specific BR-HYBRID rules).
 - `HybridMetadata` — single snapshot of XMP fields + `/AF` data.
 - `HybridAttachment` — name, MIME type, AFRelationship, ModDate, bytes, invoice-XML flag.
 
@@ -124,14 +120,14 @@ byte [] aExcel = HybridExtractor.extractAttachment (aSource, "list_of_measuremen
 ### Tier 3: validation
 
 ```java
-import com.helger.flugesel.model.ECountry;
+import com.helger.flugesel.model.EZugferdCountry;
 import com.helger.flugesel.validate.Finding;
 import com.helger.flugesel.validate.HybridValidator;
 import com.helger.flugesel.validate.ValidationResult;
 
 HybridValidator aValidator = new HybridValidator ();
 aValidator.getSettings ()
-          .setCountry (ECountry.DE)
+          .setCountry (EZugferdCountry.DE)
           .setCheckPdfA3 (true)
           .setApplyDePdfADowngrade (true);
 
@@ -240,7 +236,7 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
-v0.1.0 - 2026-05-11 (in development)
+v0.1.0 - 2026-05-12 (in development)
 * Initial scaffold based on the cross-version requirements analysis in `docs/requirements/`.
 * Tier 1 detection: recognises all five XMP extension-schema namespaces seen across ZUGFeRD
   1.0, 2.0.1, 2.1, 2.2, 2.3, 2.3.2, 2.3.3 and 2.4.
@@ -248,7 +244,11 @@ v0.1.0 - 2026-05-11 (in development)
   MIME type.
 * Tier 3 validation: BR-HYBRID-01 through BR-HYBRID-15 (and the BR-HYBRID-DE-*/-FR-* country
   variants) plus PDF/A-3 conformance via the `IPdfA3Validator` SPI implemented by
-  `flugesel-verapdf` using veraPDF 1.26.x.
-* `IHybridSource` abstraction with re-readability tracking; sources can be created from
-  `byte[]`, `ByteBuffer`, `File`, `Path`, `URL`, `InputStream` (one-shot or materialised).
+  `flugesel-verapdf` using veraPDF 1.28.1 (`-jakarta` artifact line, JAXB 4.x only).
+* `IHybridSource` is byte-array centric: `getBytes()` + `getSize()` + `getName()`. Factories for
+  `byte[]`, `ByteBuffer`, `File`, `Path`, `URL`, `InputStream`, classpath resource. File / URL
+  sources read lazily and cache.
+* Shared test fixtures live in `flugesel-testfiles` (mirrors the `ph-cii-testfiles` /
+  `peppol-commons` pattern): five representative sample PDFs (one per distinct PDF-carrier
+  generation) shipped as classpath resources with a `FlugeselTestFiles` resource-path locator.
 * Command-line client with subcommands `inspect`, `extract`, `attachments`, `validate`.

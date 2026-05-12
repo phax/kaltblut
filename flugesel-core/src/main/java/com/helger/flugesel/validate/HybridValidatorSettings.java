@@ -20,7 +20,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.concurrent.NotThreadSafe;
-import com.helger.flugesel.model.ECountry;
+import com.helger.flugesel.model.EZugferdCountry;
 import com.helger.flugesel.model.EZugferdFlavor;
 
 /**
@@ -32,23 +32,23 @@ import com.helger.flugesel.model.EZugferdFlavor;
 @NotThreadSafe
 public final class HybridValidatorSettings
 {
-  private ECountry m_eCountry = ECountry.OTHER;
+  private EZugferdCountry m_eCountry = EZugferdCountry.OTHER;
   private EZugferdFlavor m_eExpectedFlavor;
   private boolean m_bCheckPdfA3 = true;
   private boolean m_bApplyDePdfADowngrade = true;
 
   /**
    * @return the country context. Drives BR-HYBRID-DE-*, BR-HYBRID-FR-*, BR-FX-DE-*. Default is
-   *         {@link ECountry#OTHER}.
+   *         {@link EZugferdCountry#OTHER}.
    */
   @NonNull
-  public ECountry getCountry ()
+  public EZugferdCountry getCountry ()
   {
     return m_eCountry;
   }
 
   @NonNull
-  public HybridValidatorSettings setCountry (@NonNull final ECountry eCountry)
+  public HybridValidatorSettings setCountry (@NonNull final EZugferdCountry eCountry)
   {
     if (eCountry == null)
       throw new IllegalArgumentException ("country must not be null");
@@ -87,7 +87,7 @@ public final class HybridValidatorSettings
 
   /**
    * @return whether to apply the <code>BR-FX-DE-03</code> downgrade (PDF/A-3 fatal errors become
-   *         warnings when {@link #getCountry()} is {@link ECountry#DE} and the XML is valid /
+   *         warnings when {@link #getCountry()} is {@link EZugferdCountry#DE} and the XML is valid /
    *         extractable). Default <code>true</code>.
    */
   public boolean isApplyDePdfADowngrade ()

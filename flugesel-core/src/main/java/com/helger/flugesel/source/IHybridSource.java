@@ -16,26 +16,40 @@
  */
 package com.helger.flugesel.source;
 
-import org.jspecify.annotations.Nullable;
+import java.io.IOException;
 
-import com.helger.base.io.iface.IHasInputStream;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Abstraction for a source of ZUGFeRD / Factur-X hybrid invoice bytes (the PDF envelope).
  * <p>
- * Re-readability is exposed via {@link #isReadMultiple()} inherited from {@link IHasInputStream}.
- * A re-readable source can be passed to multiple flugesel operations (inspect, extract, validate)
- * without re-loading; a single-read source can only be consumed once and callers should either use
- * {@link HybridSource#materialize} up front or compose all operations through a
- * {@link HybridDocument}.
+ * The contract is byte-array-centric on purpose: every flugesel operation eventually needs the
+ * complete PDF in memory (PDFBox 3 requires random access), so distinguishing single-read from
+ * multi-read inputs adds API surface without value. Implementations may read lazily on first call
+ * and cache the result.
+ * <p>
+ * Implementations must return the same content on every call to {@link #getBytes()}. They are not
+ * required to return a defensive copy; callers must not modify the returned array.
  *
  * @author Philip Helger
  */
-public interface IHybridSource extends IHasInputStream
+public interface IHybridSource
 {
   /**
-   * @return the size of the source in bytes if known, or <code>-1</code> if not known. Used as a
-   *         hint only; consumers must not rely on it being accurate when not known.
+   * Return the complete PDF bytes.
+   *
+   * @return the bytes. Never <code>null</code>.
+   * @throws IOException
+   *         on I/O failure while reading lazily.
+   */
+  @NonNull
+  byte [] getBytes () throws IOException;
+
+  /**
+   * @return the size of the source in bytes if known, or <code>-1</code> if not known up front.
+   *         Hint only; once {@link #getBytes()} has been called the canonical size is
+   *         <code>getBytes().length</code>.
    */
   default long getSize ()
   {
@@ -43,8 +57,8 @@ public interface IHybridSource extends IHasInputStream
   }
 
   /**
-   * @return a short human-readable identifier of this source, e.g. a file name. May be
-   *         <code>null</code>. Used only for diagnostic messages.
+   * @return a short human-readable identifier of this source, e.g. a file name or classpath
+   *         resource. May be <code>null</code>. Used only for diagnostic messages.
    */
   @Nullable
   default String getName ()

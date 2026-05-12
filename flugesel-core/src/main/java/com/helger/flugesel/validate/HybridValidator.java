@@ -29,13 +29,12 @@ import com.helger.base.enforce.ValueEnforcer;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.flugesel.model.EAFRelationship;
-import com.helger.flugesel.model.ECountry;
-import com.helger.flugesel.model.EProfile;
+import com.helger.flugesel.model.EZugferdCountry;
+import com.helger.flugesel.model.EZugferdProfile;
 import com.helger.flugesel.model.EZugferdFlavor;
 import com.helger.flugesel.model.HybridAttachment;
 import com.helger.flugesel.model.HybridMetadata;
 import com.helger.flugesel.pdfbox.HybridDocument;
-import com.helger.flugesel.source.HybridSource;
 import com.helger.flugesel.source.IHybridSource;
 
 /**
@@ -81,14 +80,13 @@ public final class HybridValidator
   public ValidationResult validate (@NonNull final IHybridSource aSource) throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
-    final IHybridSource aReadable = HybridSource.ensureReadMultiple (aSource);
 
     final ICommonsList <Finding> aFindings = new CommonsArrayList <> ();
     HybridMetadata aMeta = null;
     ICommonsList <HybridAttachment> aAttachments = new CommonsArrayList <> ();
     boolean bXmlExtractable = false;
 
-    try (final HybridDocument aDoc = HybridDocument.open (aReadable))
+    try (final HybridDocument aDoc = HybridDocument.open (aSource))
     {
       aMeta = aDoc.readMetadata ();
       aAttachments = aDoc.listAttachments ();
@@ -104,10 +102,10 @@ public final class HybridValidator
     // PDF/A-3 (optional)
     if (m_aSettings.isCheckPdfA3 ())
     {
-      ICommonsList <Finding> aPdfAFindings = _runPdfA3 (aReadable);
+      ICommonsList <Finding> aPdfAFindings = _runPdfA3 (aSource);
       // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
       if (m_aSettings.isApplyDePdfADowngrade () &&
-          m_aSettings.getCountry () == ECountry.DE &&
+          m_aSettings.getCountry () == EZugferdCountry.DE &&
           bXmlExtractable &&
           aPdfAFindings != null &&
           !aPdfAFindings.isEmpty ())
@@ -179,7 +177,7 @@ public final class HybridValidator
                              "/Metadata"));
 
     // BR-HYBRID-07 (Fatal): ConformanceLevel from the HybridConformanceType code list.
-    final EProfile eProfile = aMeta.getProfile ();
+    final EZugferdProfile eProfile = aMeta.getProfile ();
     final String sRawProfile = aMeta.getRawProfile ();
     if (sRawProfile == null)
       aOut.add (new Finding ("BR-HYBRID-07",
@@ -271,21 +269,21 @@ public final class HybridValidator
                              "/Metadata"));
 
     // BR-HYBRID-DE-01 / DE-02 (Fatal): MINIMUM and BASIC WL must not be used DE↔DE.
-    if (m_aSettings.getCountry () == ECountry.DE)
+    if (m_aSettings.getCountry () == EZugferdCountry.DE)
     {
-      if (eProfile == EProfile.MINIMUM)
+      if (eProfile == EZugferdProfile.MINIMUM)
         aOut.add (new Finding ("BR-HYBRID-DE-01",
                                ESeverity.FATAL,
                                "MINIMUM profile is not permitted for DE↔DE invoices.",
                                null));
-      if (eProfile == EProfile.BASIC_WL)
+      if (eProfile == EZugferdProfile.BASIC_WL)
         aOut.add (new Finding ("BR-HYBRID-DE-02",
                                ESeverity.FATAL,
                                "BASIC WL profile is not permitted for DE↔DE invoices.",
                                null));
     }
     // BR-HYBRID-FR-01 (Fatal): XRECHNUNG must not be used FR↔FR.
-    if (m_aSettings.getCountry () == ECountry.FR && eProfile == EProfile.XRECHNUNG)
+    if (m_aSettings.getCountry () == EZugferdCountry.FR && eProfile == EZugferdProfile.XRECHNUNG)
       aOut.add (new Finding ("BR-HYBRID-FR-01",
                              ESeverity.FATAL,
                              "XRECHNUNG reference profile is not permitted for FR↔FR invoices.",
@@ -300,11 +298,11 @@ public final class HybridValidator
    * @return a {@link Finding} if the matrix is violated, or {@code null} if the relationship is acceptable.
    */
   @Nullable
-  private static Finding _checkAfRelationshipMatrix (@NonNull final EProfile eProfile,
+  private static Finding _checkAfRelationshipMatrix (@NonNull final EZugferdProfile eProfile,
                                                      @NonNull final EAFRelationship eRel,
-                                                     @NonNull final ECountry eCountry)
+                                                     @NonNull final EZugferdCountry eCountry)
   {
-    if (eProfile == EProfile.MINIMUM || eProfile == EProfile.BASIC_WL)
+    if (eProfile == EZugferdProfile.MINIMUM || eProfile == EZugferdProfile.BASIC_WL)
     {
       // Both FR and DE require Data
       if (eRel != EAFRelationship.DATA)
@@ -319,7 +317,7 @@ public final class HybridValidator
       return null;
     }
     // For BASIC, EN 16931, EXTENDED, COMFORT, XRECHNUNG
-    if (eCountry == ECountry.DE)
+    if (eCountry == EZugferdCountry.DE)
     {
       if (eRel != EAFRelationship.ALTERNATIVE)
         return new Finding ("BR-HYBRID-11",
@@ -332,9 +330,9 @@ public final class HybridValidator
                             "/Catalog/AF");
       return null;
     }
-    if (eCountry == ECountry.FR)
+    if (eCountry == EZugferdCountry.FR)
     {
-      if (eProfile == EProfile.XRECHNUNG)
+      if (eProfile == EZugferdProfile.XRECHNUNG)
         return new Finding ("BR-HYBRID-11",
                             ESeverity.WARNING,
                             "XRECHNUNG profile is not used in France.",

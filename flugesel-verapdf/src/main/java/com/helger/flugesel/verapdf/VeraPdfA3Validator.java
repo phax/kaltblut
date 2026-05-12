@@ -16,6 +16,7 @@
  */
 package com.helger.flugesel.verapdf;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -33,7 +34,6 @@ import org.verapdf.pdfa.results.ValidationResult;
 
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
-import com.helger.flugesel.source.HybridSource;
 import com.helger.flugesel.source.IHybridSource;
 import com.helger.flugesel.validate.ESeverity;
 import com.helger.flugesel.validate.Finding;
@@ -74,11 +74,8 @@ public final class VeraPdfA3Validator implements IPdfA3Validator
     _ensureInitialised ();
 
     final ICommonsList <Finding> aOut = new CommonsArrayList <> ();
-    final IHybridSource aReadable = HybridSource.ensureReadMultiple (aSource);
-    try (final InputStream aIS = aReadable.getInputStream ())
+    try (final InputStream aIS = new ByteArrayInputStream (aSource.getBytes ()))
     {
-      if (aIS == null)
-        throw new IOException ("Could not open input stream for PDF/A validation");
       try (final PDFAParser aParser = Foundries.defaultInstance ().createParser (aIS, PDFAFlavour.NO_FLAVOUR))
       {
         final PDFAFlavour eDetected = aParser.getFlavour ();

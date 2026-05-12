@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.base.enforce.ValueEnforcer;
-import com.helger.flugesel.model.EProfile;
+import com.helger.flugesel.model.EZugferdProfile;
 import com.helger.flugesel.model.EZugferdFlavor;
 import com.helger.flugesel.model.HybridMetadata;
 import com.helger.flugesel.pdfbox.HybridDocument;
@@ -89,7 +89,7 @@ public final class HybridInspector
    *         on I/O failure.
    */
   @Nullable
-  public static EProfile detectProfile (@NonNull final IHybridSource aSource) throws IOException
+  public static EZugferdProfile detectProfile (@NonNull final IHybridSource aSource) throws IOException
   {
     return readMetadata (aSource).getProfile ();
   }

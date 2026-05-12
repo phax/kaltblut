@@ -18,75 +18,61 @@ package com.helger.flugesel.source;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 
 import org.junit.Test;
 
-import com.helger.base.io.stream.StreamHelper;
-
 public final class HybridSourceTest
 {
-  private static byte [] _readAll (final IHybridSource aSource) throws IOException
-  {
-    try (final InputStream aIS = aSource.getInputStream ())
-    {
-      assertNotNull (aIS);
-      return StreamHelper.getAllBytes (aIS);
-    }
-  }
-
   @Test
-  public void testFromBytesIsReadMultiple () throws IOException
+  public void testFromBytesReturnsSameArray () throws IOException
   {
     final byte [] aData = "%PDF-1.7\nfoo".getBytes ();
     final IHybridSource aSource = HybridSource.fromBytes (aData);
-    assertTrue (aSource.isReadMultiple ());
     assertEquals (aData.length, aSource.getSize ());
-    assertArrayEquals (aData, _readAll (aSource));
-    // Second read works.
-    assertArrayEquals (aData, _readAll (aSource));
+    // The same backing array is returned each call (no defensive copy by contract).
+    assertSame (aData, aSource.getBytes ());
+    assertSame (aData, aSource.getBytes ());
   }
 
   @Test
-  public void testFromBytesSlice () throws IOException
+  public void testFromBytesSliceCopies () throws IOException
   {
     final byte [] aData = "AAAhelloBBB".getBytes ();
     final IHybridSource aSource = HybridSource.fromBytes (aData, 3, 5);
     assertEquals (5L, aSource.getSize ());
-    assertArrayEquals ("hello".getBytes (), _readAll (aSource));
+    assertArrayEquals ("hello".getBytes (), aSource.getBytes ());
   }
 
   @Test
-  public void testFromByteBuffer () throws IOException
+  public void testFromByteBufferCopies () throws IOException
   {
     final byte [] aData = "wrapped".getBytes ();
     final ByteBuffer aBuf = ByteBuffer.wrap (aData);
     final IHybridSource aSource = HybridSource.fromByteBuffer (aBuf);
-    assertTrue (aSource.isReadMultiple ());
-    assertArrayEquals (aData, _readAll (aSource));
+    assertArrayEquals (aData, aSource.getBytes ());
+    // The buffer position must be unchanged.
+    assertEquals (0, aBuf.position ());
   }
 
   @Test
-  public void testFromByteBufferCopiesWhenReadOnly () throws IOException
+  public void testFromByteBufferReadOnly () throws IOException
   {
     final byte [] aData = "readonly".getBytes ();
     final ByteBuffer aBuf = ByteBuffer.wrap (aData).asReadOnlyBuffer ();
     final IHybridSource aSource = HybridSource.fromByteBuffer (aBuf);
-    assertArrayEquals (aData, _readAll (aSource));
+    assertArrayEquals (aData, aSource.getBytes ());
   }
 
   @Test
-  public void testFromFile () throws IOException
+  public void testFromFileLazyReadAndCaches () throws IOException
   {
     final File aTmp = File.createTempFile ("flugesel-test-", ".bin");
     try
@@ -94,10 +80,11 @@ public final class HybridSourceTest
       final byte [] aData = "filebytes".getBytes ();
       Files.write (aTmp.toPath (), aData);
       final IHybridSource aSource = HybridSource.fromFile (aTmp);
-      assertTrue (aSource.isReadMultiple ());
       assertEquals (aData.length, aSource.getSize ());
       assertEquals (aTmp.getName (), aSource.getName ());
-      assertArrayEquals (aData, _readAll (aSource));
+      assertArrayEquals (aData, aSource.getBytes ());
+      // Subsequent call returns the cached array (identity check).
+      assertSame (aSource.getBytes (), aSource.getBytes ());
     }
     finally
     {
@@ -106,59 +93,23 @@ public final class HybridSourceTest
   }
 
   @Test
-  public void testFromInputStreamOnceIsSingleRead () throws IOException
+  public void testFromInputStream () throws IOException
   {
-    final byte [] aData = "once".getBytes ();
-    final IHybridSource aSource = HybridSource.fromInputStreamOnce (new ByteArrayInputStream (aData));
-    assertFalse (aSource.isReadMultiple ());
-    assertArrayEquals (aData, _readAll (aSource));
-    // Second acquisition returns null (source is exhausted).
-    try (final InputStream aIS = aSource.getInputStream ())
-    {
-      assertNull (aIS);
-    }
-  }
-
-  @Test
-  public void testMaterializeUpgradesToReadMultiple () throws IOException
-  {
-    final byte [] aData = "buffered".getBytes ();
-    final IHybridSource aSource = HybridSource.materialize (new ByteArrayInputStream (aData));
-    assertTrue (aSource.isReadMultiple ());
-    assertArrayEquals (aData, _readAll (aSource));
-    assertArrayEquals (aData, _readAll (aSource));
-  }
-
-  @Test
-  public void testEnsureReadMultipleIsNoOpForReadable () throws IOException
-  {
-    final IHybridSource aIn = HybridSource.fromBytes (new byte [] { 1, 2, 3 });
-    final IHybridSource aOut = HybridSource.ensureReadMultiple (aIn);
-    assertEquals (aIn, aOut);
-  }
-
-  @Test
-  public void testEnsureReadMultipleUpgradesSingleRead () throws IOException
-  {
-    final byte [] aData = "upgrade".getBytes ();
-    final IHybridSource aIn = HybridSource.fromInputStreamOnce (new ByteArrayInputStream (aData));
-    assertFalse (aIn.isReadMultiple ());
-    final IHybridSource aOut = HybridSource.ensureReadMultiple (aIn);
-    assertTrue (aOut.isReadMultiple ());
-    assertArrayEquals (aData, _readAll (aOut));
-    assertArrayEquals (aData, _readAll (aOut));
+    final byte [] aData = "stream".getBytes ();
+    final IHybridSource aSource = HybridSource.fromInputStream (new ByteArrayInputStream (aData));
+    assertArrayEquals (aData, aSource.getBytes ());
+    // Calling getBytes() again returns the same materialised array.
+    assertSame (aSource.getBytes (), aSource.getBytes ());
   }
 
   @Test
   public void testFromClasspath () throws IOException
   {
-    // Use one of the shipped sample PDFs from flugesel-testfiles. We do not check the exact bytes
-    // (the resource is potentially several MB) — only that the factory produces a re-readable
-    // source with a sensible size and name.
     final IHybridSource aSource = HybridSource.fromClasspath ("external/zugferd/2.0.1/zugferd_2p0_EN16931_Einfach.pdf");
-    assertTrue (aSource.isReadMultiple ());
     assertTrue ("PDF resource must have non-zero size", aSource.getSize () > 0);
-    assertTrue ("PDF bytes should start with %PDF", _readAll (aSource)[0] == (byte) '%');
+    final byte [] aBytes = aSource.getBytes ();
+    assertTrue ("PDF bytes should start with %PDF", aBytes[0] == (byte) '%' && aBytes[1] == (byte) 'P');
+    assertEquals ("external/zugferd/2.0.1/zugferd_2p0_EN16931_Einfach.pdf", aSource.getName ());
   }
 
   @Test (expected = IOException.class)

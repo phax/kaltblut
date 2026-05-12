@@ -27,23 +27,23 @@ public final class EZugferdFlavorTest
   public void testKnownNamespaceURIs ()
   {
     assertEquals (EZugferdFlavor.ZUGFERD_1,
-                  EZugferdFlavor.getFromNamespaceURI ("urn:ferd:pdfa:CrossIndustryDocument:invoice:1p0#"));
+                  EZugferdFlavor.getFromNamespaceURIOrNull ("urn:ferd:pdfa:CrossIndustryDocument:invoice:1p0#"));
     assertEquals (EZugferdFlavor.ZUGFERD_2_0_LEGACY,
-                  EZugferdFlavor.getFromNamespaceURI ("urn:zugferd:pdfa:CrossIndustryDocument:invoice:2p0#"));
+                  EZugferdFlavor.getFromNamespaceURIOrNull ("urn:zugferd:pdfa:CrossIndustryDocument:invoice:2p0#"));
     assertEquals (EZugferdFlavor.FACTURX_PRIMARY,
-                  EZugferdFlavor.getFromNamespaceURI ("urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#"));
+                  EZugferdFlavor.getFromNamespaceURIOrNull ("urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#"));
     assertEquals (EZugferdFlavor.ZUGFERD_2_2_LEGACY,
-                  EZugferdFlavor.getFromNamespaceURI ("urn:zugferd:pdfa:CrossIndustryDocument:invoice:1p0#"));
+                  EZugferdFlavor.getFromNamespaceURIOrNull ("urn:zugferd:pdfa:CrossIndustryDocument:invoice:1p0#"));
     assertEquals (EZugferdFlavor.FACTURX_BR_HYBRID_04,
-                  EZugferdFlavor.getFromNamespaceURI ("urn:factur-x:pdfa:CrossIndustryDocument:1p0#"));
+                  EZugferdFlavor.getFromNamespaceURIOrNull ("urn:factur-x:pdfa:CrossIndustryDocument:1p0#"));
   }
 
   @Test
   public void testUnknownAndNull ()
   {
-    assertNull (EZugferdFlavor.getFromNamespaceURI (null));
-    assertNull (EZugferdFlavor.getFromNamespaceURI (""));
-    assertNull (EZugferdFlavor.getFromNamespaceURI ("urn:unknown:something#"));
+    assertNull (EZugferdFlavor.getFromNamespaceURIOrNull (null));
+    assertNull (EZugferdFlavor.getFromNamespaceURIOrNull (""));
+    assertNull (EZugferdFlavor.getFromNamespaceURIOrNull ("urn:unknown:something#"));
   }
 
   @Test

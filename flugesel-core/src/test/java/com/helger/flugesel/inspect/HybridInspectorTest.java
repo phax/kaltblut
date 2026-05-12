@@ -24,7 +24,7 @@ import java.io.IOException;
 import org.junit.Test;
 
 import com.helger.flugesel.model.EAFRelationship;
-import com.helger.flugesel.model.EProfile;
+import com.helger.flugesel.model.EZugferdProfile;
 import com.helger.flugesel.model.EZugferdFlavor;
 import com.helger.flugesel.model.HybridMetadata;
 import com.helger.flugesel.source.HybridSource;
@@ -47,7 +47,7 @@ public final class HybridInspectorTest
     assertEquals ("INVOICE", aMeta.getXmpDocumentType ());
     assertEquals ("zugferd-invoice.xml", aMeta.getXmpDocumentFileName ());
     assertEquals ("zugferd-invoice.xml", aMeta.getEmbeddedFileName ());
-    assertEquals (EProfile.EN_16931, aMeta.getProfile ());
+    assertEquals (EZugferdProfile.EN_16931, aMeta.getProfile ());
     assertEquals (EAFRelationship.ALTERNATIVE, aMeta.getAFRelationship ());
   }
 
@@ -59,7 +59,7 @@ public final class HybridInspectorTest
     assertEquals (EZugferdFlavor.FACTURX_PRIMARY, aMeta.getFlavor ());
     assertEquals ("factur-x.xml", aMeta.getXmpDocumentFileName ());
     assertEquals ("factur-x.xml", aMeta.getEmbeddedFileName ());
-    assertEquals (EProfile.EN_16931, aMeta.getProfile ());
+    assertEquals (EZugferdProfile.EN_16931, aMeta.getProfile ());
     // 2.1 sample uses Data (recipient side, not the German Alternative pattern).
     assertEquals (EAFRelationship.DATA, aMeta.getAFRelationship ());
   }
@@ -69,7 +69,7 @@ public final class HybridInspectorTest
   {
     final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_2_XRECHNUNG));
     assertEquals (EZugferdFlavor.FACTURX_PRIMARY, aMeta.getFlavor ());
-    assertEquals (EProfile.XRECHNUNG, aMeta.getProfile ());
+    assertEquals (EZugferdProfile.XRECHNUNG, aMeta.getProfile ());
     // XRECHNUNG profile uses xrechnung.xml instead of factur-x.xml.
     assertEquals ("xrechnung.xml", aMeta.getEmbeddedFileName ());
     assertEquals ("xrechnung.xml", aMeta.getXmpDocumentFileName ());
@@ -81,7 +81,7 @@ public final class HybridInspectorTest
   public void test_2_3_MinimumProfileUsesDataRelationship () throws IOException
   {
     final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_3_MINIMUM));
-    assertEquals (EProfile.MINIMUM, aMeta.getProfile ());
+    assertEquals (EZugferdProfile.MINIMUM, aMeta.getProfile ());
     assertEquals (EAFRelationship.DATA, aMeta.getAFRelationship ());
     assertEquals ("factur-x.xml", aMeta.getEmbeddedFileName ());
   }
@@ -91,7 +91,7 @@ public final class HybridInspectorTest
   {
     final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_4_BASIC_WL));
     assertEquals (EZugferdFlavor.FACTURX_PRIMARY, aMeta.getFlavor ());
-    assertEquals (EProfile.BASIC_WL, aMeta.getProfile ());
+    assertEquals (EZugferdProfile.BASIC_WL, aMeta.getProfile ());
     assertEquals (EAFRelationship.DATA, aMeta.getAFRelationship ());
     assertEquals ("1.0", aMeta.getXmpVersion ());
   }

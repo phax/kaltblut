@@ -23,7 +23,7 @@ import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.helger.flugesel.model.ECountry;
+import com.helger.flugesel.model.EZugferdCountry;
 import com.helger.flugesel.source.HybridSource;
 import com.helger.flugesel.source.IHybridSource;
 import com.helger.flugesel.validate.Finding;
@@ -43,7 +43,7 @@ public final class ValidateCommand implements Callable <Integer>
 
   @Option (names = { "-c", "--country" },
            description = "Country context for country-specific rules: ${COMPLETION-CANDIDATES} (default: OTHER).")
-  private ECountry m_eCountry = ECountry.OTHER;
+  private EZugferdCountry m_eCountry = EZugferdCountry.OTHER;
 
   @Option (names = { "--no-pdfa" }, description = "Skip PDF/A-3 validation via the IPdfA3Validator SPI.")
   private boolean m_bNoPdfA;

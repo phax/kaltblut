@@ -25,7 +25,7 @@ import java.util.ServiceLoader;
 import org.junit.Test;
 
 import com.helger.collection.commons.ICommonsList;
-import com.helger.flugesel.model.ECountry;
+import com.helger.flugesel.model.EZugferdCountry;
 import com.helger.flugesel.source.HybridSource;
 import com.helger.flugesel.testfiles.FlugeselTestFiles;
 import com.helger.flugesel.validate.ESeverity;
@@ -74,7 +74,7 @@ public final class VeraPdfA3ValidatorTest
   public void testEndToEndViaHybridValidator () throws IOException
   {
     final HybridValidator v = new HybridValidator ();
-    v.getSettings ().setCountry (ECountry.OTHER).setCheckPdfA3 (true);
+    v.getSettings ().setCountry (EZugferdCountry.OTHER).setCheckPdfA3 (true);
     final ValidationResult aRes = v.validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931));
     // With flugesel-verapdf on the classpath, no SPI-missing INFO finding should be present.
     assertTrue (!aRes.hasRule ("FLUGESEL-PDFA-SPI-MISSING"));

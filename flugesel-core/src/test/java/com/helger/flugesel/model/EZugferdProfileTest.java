@@ -21,46 +21,46 @@ import static org.junit.Assert.assertNull;
 
 import org.junit.Test;
 
-public final class EProfileTest
+public final class EZugferdProfileTest
 {
   @Test
   public void testCanonicalIDs ()
   {
-    assertEquals (EProfile.MINIMUM, EProfile.getFromIDOrNull ("MINIMUM"));
-    assertEquals (EProfile.BASIC_WL, EProfile.getFromIDOrNull ("BASIC WL"));
-    assertEquals (EProfile.BASIC, EProfile.getFromIDOrNull ("BASIC"));
-    assertEquals (EProfile.EN_16931, EProfile.getFromIDOrNull ("EN 16931"));
-    assertEquals (EProfile.EXTENDED, EProfile.getFromIDOrNull ("EXTENDED"));
-    assertEquals (EProfile.XRECHNUNG, EProfile.getFromIDOrNull ("XRECHNUNG"));
-    assertEquals (EProfile.COMFORT, EProfile.getFromIDOrNull ("COMFORT"));
+    assertEquals (EZugferdProfile.MINIMUM, EZugferdProfile.getFromIDOrNull ("MINIMUM"));
+    assertEquals (EZugferdProfile.BASIC_WL, EZugferdProfile.getFromIDOrNull ("BASIC WL"));
+    assertEquals (EZugferdProfile.BASIC, EZugferdProfile.getFromIDOrNull ("BASIC"));
+    assertEquals (EZugferdProfile.EN_16931, EZugferdProfile.getFromIDOrNull ("EN 16931"));
+    assertEquals (EZugferdProfile.EXTENDED, EZugferdProfile.getFromIDOrNull ("EXTENDED"));
+    assertEquals (EZugferdProfile.XRECHNUNG, EZugferdProfile.getFromIDOrNull ("XRECHNUNG"));
+    assertEquals (EZugferdProfile.COMFORT, EZugferdProfile.getFromIDOrNull ("COMFORT"));
   }
 
   /** "EN16931" (no space) is a known alias permitted in implementations per 2.1 Supplement A. */
   @Test
   public void testEn16931WhitespaceAlias ()
   {
-    assertEquals (EProfile.EN_16931, EProfile.getFromIDOrNull ("EN16931"));
+    assertEquals (EZugferdProfile.EN_16931, EZugferdProfile.getFromIDOrNull ("EN16931"));
   }
 
   @Test
   public void testBasicWlUnderscoreAlias ()
   {
     // Some implementations use "BASIC_WL" with an underscore.
-    assertEquals (EProfile.BASIC_WL, EProfile.getFromIDOrNull ("BASIC_WL"));
+    assertEquals (EZugferdProfile.BASIC_WL, EZugferdProfile.getFromIDOrNull ("BASIC_WL"));
   }
 
   @Test
   public void testCaseInsensitive ()
   {
-    assertEquals (EProfile.EXTENDED, EProfile.getFromIDOrNull ("extended"));
-    assertEquals (EProfile.XRECHNUNG, EProfile.getFromIDOrNull ("xrechnung"));
+    assertEquals (EZugferdProfile.EXTENDED, EZugferdProfile.getFromIDOrNull ("extended"));
+    assertEquals (EZugferdProfile.XRECHNUNG, EZugferdProfile.getFromIDOrNull ("xrechnung"));
   }
 
   @Test
   public void testNullAndUnknown ()
   {
-    assertNull (EProfile.getFromIDOrNull (null));
-    assertNull (EProfile.getFromIDOrNull (""));
-    assertNull (EProfile.getFromIDOrNull ("FOO"));
+    assertNull (EZugferdProfile.getFromIDOrNull (null));
+    assertNull (EZugferdProfile.getFromIDOrNull (""));
+    assertNull (EZugferdProfile.getFromIDOrNull ("FOO"));
   }
 }
