@@ -1,4 +1,4 @@
-# flugesel
+# FlugEsel
 
 A Java toolkit for working with **ZUGFeRD / Factur-X** hybrid invoices: detect the flavor of any
 hybrid PDF, extract the embedded XML and supporting attachments, and validate the carrier-side
@@ -238,19 +238,10 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
-v0.1.0 - 2026-05-12 (in development)
-* Initial scaffold based on the cross-version requirements analysis in `docs/requirements/`.
-* Tier 1 detection: recognises all five XMP extension-schema namespaces seen across ZUGFeRD
-  1.0, 2.0.1, 2.1, 2.2, 2.3, 2.3.2, 2.3.3 and 2.4.
-* Tier 2 extraction: invoice XML, named attachments, full attachment list including ModDate and
-  MIME type.
-* Tier 3 validation: BR-HYBRID-01 through BR-HYBRID-15 (and the BR-HYBRID-DE-*/-FR-* country
+v0.9.0 - 2026-05-12 (in development)
+* Detection: recognises all five XMP extension-schema namespaces seen across ZUGFeRD 1.0, 2.0.1, 2.1, 2.2, 2.3, 2.3.2, 2.3.3 and 2.4.
+* Extraction: invoice XML, named attachments, full attachment list including Modification Date and MIME type.
+* Validation: BR-HYBRID-01 through BR-HYBRID-15 (and the BR-HYBRID-DE-*/-FR-* country
   variants) plus PDF/A-3 conformance via the `IPdfA3ValidatorSPI` SPI implemented by
   `flugesel-verapdf` using veraPDF 1.28.1 (`-jakarta` artifact line, JAXB 4.x only).
-* `IHybridSource` is byte-array centric: `getBytes()` + `getSize()` + `getName()`. Factories for
-  `byte[]`, `ByteBuffer`, `File`, `Path`, `URL`, `InputStream`, classpath resource. File / URL
-  sources read lazily and cache.
-* Shared test fixtures live in `flugesel-testfiles` (mirrors the `ph-cii-testfiles` /
-  `peppol-commons` pattern): five representative sample PDFs (one per distinct PDF-carrier
-  generation) shipped as classpath resources with a `FlugeselTestFiles` resource-path locator.
 * Command-line client with subcommands `inspect`, `extract`, `attachments`, `validate`.
