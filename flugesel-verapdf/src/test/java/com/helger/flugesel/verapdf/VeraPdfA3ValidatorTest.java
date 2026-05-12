@@ -25,19 +25,19 @@ import java.util.ServiceLoader;
 import org.junit.Test;
 
 import com.helger.collection.commons.ICommonsList;
-import com.helger.flugesel.model.EZugferdCountry;
-import com.helger.flugesel.source.HybridSource;
+import com.helger.flugesel.core.model.EZugferdCountry;
+import com.helger.flugesel.core.source.HybridSource;
+import com.helger.flugesel.core.validate.EHybridSeverity;
+import com.helger.flugesel.core.validate.HybridFinding;
+import com.helger.flugesel.core.validate.HybridValidator;
+import com.helger.flugesel.core.validate.IPdfA3ValidatorSPI;
+import com.helger.flugesel.core.validate.ValidationResult;
 import com.helger.flugesel.testfiles.FlugeselTestFiles;
-import com.helger.flugesel.validate.ESeverity;
-import com.helger.flugesel.validate.Finding;
-import com.helger.flugesel.validate.HybridValidator;
-import com.helger.flugesel.validate.IPdfA3Validator;
-import com.helger.flugesel.validate.ValidationResult;
 
 /**
- * Smoke tests for the veraPDF adapter. We do not check exact rule IDs because they evolve with
- * the veraPDF version; instead we verify the wiring works end-to-end and produces structured
- * findings (rather than throwing) on a real ZUGFeRD sample.
+ * Smoke tests for the veraPDF adapter. We do not check exact rule IDs because they evolve with the
+ * veraPDF version; instead we verify the wiring works end-to-end and produces structured findings
+ * (rather than throwing) on a real ZUGFeRD sample.
  *
  * @author Philip Helger
  */
@@ -47,26 +47,24 @@ public final class VeraPdfA3ValidatorTest
   public void testServiceLoaderRegistration ()
   {
     boolean bFound = false;
-    for (final IPdfA3Validator aV : ServiceLoader.load (IPdfA3Validator.class))
-    {
-      if (aV instanceof VeraPdfA3Validator)
+    for (final IPdfA3ValidatorSPI aV : ServiceLoader.load (IPdfA3ValidatorSPI.class))
+      if (aV instanceof VeraPdfA3ValidatorSPI)
       {
         bFound = true;
         break;
       }
-    }
     assertTrue ("VeraPdfA3Validator must be discoverable via ServiceLoader", bFound);
   }
 
   @Test
   public void testValidate_RealSampleProducesFindings () throws IOException
   {
-    final ICommonsList <Finding> aFindings = new VeraPdfA3Validator ().validatePdfA3 (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931));
+    final ICommonsList <HybridFinding> aFindings = new VeraPdfA3ValidatorSPI ().validatePdfA3 (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931));
     assertNotNull (aFindings);
     // Validation must complete cleanly (no internal-error finding). Real-world ZUGFeRD samples
     // sometimes fail strict PDF/A-3 checks; we do not assert the absence of FATAL rule findings,
     // only that the validator itself did not crash.
-    for (final Finding aF : aFindings)
+    for (final HybridFinding aF : aFindings)
       assertTrue ("Unexpected internal validator error: " + aF, !"VERAPDF-ERROR".equals (aF.getRuleID ()));
   }
 
@@ -80,6 +78,6 @@ public final class VeraPdfA3ValidatorTest
     assertTrue (!aRes.hasRule ("FLUGESEL-PDFA-SPI-MISSING"));
     // Validator must complete and produce at least the BR-HYBRID-01 informational finding.
     assertNotNull (aRes.findByRuleID ("BR-HYBRID-01"));
-    assertNotNull (aRes.getFindings (ESeverity.FATAL));
+    assertNotNull (aRes.getFindings (EHybridSeverity.FATAL));
   }
 }

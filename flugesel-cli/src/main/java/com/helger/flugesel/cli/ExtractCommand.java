@@ -24,9 +24,9 @@ import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.helger.flugesel.extract.HybridExtractor;
-import com.helger.flugesel.source.HybridSource;
-import com.helger.flugesel.source.IHybridSource;
+import com.helger.flugesel.core.extract.HybridExtractor;
+import com.helger.flugesel.core.source.HybridSource;
+import com.helger.flugesel.core.source.IHybridSource;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;

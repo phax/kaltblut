@@ -91,17 +91,17 @@
 
       <dependency>
         <groupId>com.helger.flugesel</groupId>
+        <artifactId>flugesel-testfiles</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.helger.flugesel</groupId>
         <artifactId>flugesel-core</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.helger.flugesel</groupId>
         <artifactId>flugesel-verapdf</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.helger.flugesel</groupId>
-        <artifactId>flugesel-testfiles</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>
@@ -116,8 +116,8 @@
   </dependencies>
 
   <modules>
-    <module>flugesel-core</module>
     <module>flugesel-testfiles</module>
+    <module>flugesel-core</module>
     <module>flugesel-verapdf</module>
     <module>flugesel-cli</module>
   </modules>

@@ -23,10 +23,10 @@ import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.helger.flugesel.inspect.HybridInspector;
-import com.helger.flugesel.model.HybridMetadata;
-import com.helger.flugesel.source.HybridSource;
-import com.helger.flugesel.source.IHybridSource;
+import com.helger.flugesel.core.inspect.HybridInspector;
+import com.helger.flugesel.core.model.HybridMetadata;
+import com.helger.flugesel.core.source.HybridSource;
+import com.helger.flugesel.core.source.IHybridSource;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;

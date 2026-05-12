@@ -16,7 +16,11 @@
  */
 package com.helger.flugesel.testfiles;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.concurrent.Immutable;
 
@@ -43,9 +47,8 @@ public final class FlugeselTestFiles
   public static final String ZF_2_0_1_EN16931 = PREFIX + "2.0.1/zugferd_2p0_EN16931_Einfach.pdf";
 
   /**
-   * ZUGFeRD 2.1 sample with the EN16931 profile and embedded supporting documents. First
-   * appearance of the {@code urn:factur-x:...:1p0} primary namespace; embedded XML named
-   * {@code factur-x.xml}.
+   * ZUGFeRD 2.1 sample with the EN16931 profile and embedded supporting documents. First appearance
+   * of the {@code urn:factur-x:...:1p0} primary namespace; embedded XML named {@code factur-x.xml}.
    */
   public static final String ZF_2_1_EN16931_EMBEDDED = PREFIX + "2.1/zugferd_2p1_EN16931_Elektron_embedded.pdf";
 
@@ -62,8 +65,8 @@ public final class FlugeselTestFiles
   public static final String ZF_2_3_MINIMUM = PREFIX + "2.3/MINIMUM_Buchungshilfe.pdf";
 
   /**
-   * ZUGFeRD 2.4 BASIC WL sample. Latest published spec generation; PDF carrier rules are
-   * identical to 2.3.
+   * ZUGFeRD 2.4 BASIC WL sample. Latest published spec generation; PDF carrier rules are identical
+   * to 2.3.
    */
   public static final String ZF_2_4_BASIC_WL = PREFIX + "2.4/BASIC-WL_Einfach_fx.pdf";
 
@@ -76,15 +79,17 @@ public final class FlugeselTestFiles
    * @param sResourcePath
    *        the resource path. May not be <code>null</code>.
    * @return the resource bytes, or <code>null</code> if the resource is not on the classpath.
-   * @throws java.io.IOException
+   * @throws IOException
    *         on read failure.
    */
-  public static byte [] readBytes (@NonNull final String sResourcePath) throws java.io.IOException
+  @Nullable
+  public static byte [] readBytes (@NonNull final String sResourcePath) throws IOException
   {
-    try (final java.io.InputStream aIS = FlugeselTestFiles.class.getClassLoader ().getResourceAsStream (sResourcePath))
+    try (final InputStream aIS = FlugeselTestFiles.class.getClassLoader ().getResourceAsStream (sResourcePath))
     {
       if (aIS == null)
         return null;
+
       return aIS.readAllBytes ();
     }
   }

@@ -23,12 +23,12 @@ import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.helger.flugesel.model.EZugferdCountry;
-import com.helger.flugesel.source.HybridSource;
-import com.helger.flugesel.source.IHybridSource;
-import com.helger.flugesel.validate.Finding;
-import com.helger.flugesel.validate.HybridValidator;
-import com.helger.flugesel.validate.ValidationResult;
+import com.helger.flugesel.core.model.EZugferdCountry;
+import com.helger.flugesel.core.source.HybridSource;
+import com.helger.flugesel.core.source.IHybridSource;
+import com.helger.flugesel.core.validate.HybridFinding;
+import com.helger.flugesel.core.validate.HybridValidator;
+import com.helger.flugesel.core.validate.ValidationResult;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -87,7 +87,7 @@ public final class ValidateCommand implements Callable <Integer>
         aValidator.getSettings ().setApplyDePdfADowngrade (!m_bNoDeDowngrade);
         final ValidationResult aRes = aValidator.validate (aSource);
         System.out.println ("File: " + aFile.getName () + "  (" + aRes.getFindingCount () + " finding(s))");
-        for (final Finding aF : aRes.getAllFindings ())
+        for (final HybridFinding aF : aRes.getAllFindings ())
         {
           System.out.println ("  " + aF);
           switch (aF.getSeverity ())
