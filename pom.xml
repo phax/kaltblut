@@ -64,7 +64,8 @@
 
   <properties>
     <pdfbox.version>3.0.6</pdfbox.version>
-    <verapdf.version>1.26.2</verapdf.version>
+    <picocli.version>4.7.7</picocli.version>
+    <verapdf.version>1.28.1</verapdf.version>
   </properties>
 
   <dependencyManagement>
@@ -75,17 +76,6 @@
         <version>12.2.5</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>com.helger.flugesel</groupId>
-        <artifactId>flugesel-core</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.helger.flugesel</groupId>
-        <artifactId>flugesel-verapdf</artifactId>
-        <version>${project.version}</version>
       </dependency>
 
       <dependency>
@@ -100,43 +90,19 @@
       </dependency>
 
       <dependency>
-        <groupId>org.verapdf</groupId>
-        <artifactId>validation-model</artifactId>
-        <version>${verapdf.version}</version>
-      </dependency>
-
-      <!--
-        veraPDF 1.26.x uses the legacy javax.xml.bind API and expects com.sun.xml.bind.v2.ContextFactory
-        at runtime. The ph-commons BOM pins jaxb-runtime to a 4.x (Jakarta-namespace) version which
-        does not provide that class. Force the older 2.3.x line to keep veraPDF working. Declared
-        here (not transitively in flugesel-verapdf) so the version is also applied in flugesel-cli
-        when shading.
-      -->
-      <dependency>
-        <groupId>org.glassfish.jaxb</groupId>
-        <artifactId>jaxb-runtime</artifactId>
-        <version>2.3.9</version>
+        <groupId>com.helger.flugesel</groupId>
+        <artifactId>flugesel-core</artifactId>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.glassfish.jaxb</groupId>
-        <artifactId>jaxb-core</artifactId>
-        <version>2.3.9</version>
+        <groupId>com.helger.flugesel</groupId>
+        <artifactId>flugesel-verapdf</artifactId>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.glassfish.jaxb</groupId>
-        <artifactId>txw2</artifactId>
-        <version>2.3.9</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.activation</groupId>
-        <artifactId>jakarta.activation</artifactId>
-        <version>1.2.2</version>
-      </dependency>
-
-      <dependency>
-        <groupId>info.picocli</groupId>
-        <artifactId>picocli</artifactId>
-        <version>4.7.7</version>
+        <groupId>com.helger.flugesel</groupId>
+        <artifactId>flugesel-testfiles</artifactId>
+        <version>${project.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -151,6 +117,7 @@
 
   <modules>
     <module>flugesel-core</module>
+    <module>flugesel-testfiles</module>
     <module>flugesel-verapdf</module>
     <module>flugesel-cli</module>
   </modules>

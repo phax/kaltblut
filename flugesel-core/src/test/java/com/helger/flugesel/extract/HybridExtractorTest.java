@@ -29,15 +29,14 @@ import org.junit.Test;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.flugesel.model.HybridAttachment;
 import com.helger.flugesel.source.HybridSource;
-import com.helger.flugesel.testutil.SamplePDFs;
+import com.helger.flugesel.testfiles.FlugeselTestFiles;
 
 public final class HybridExtractorTest
 {
   @Test
   public void testExtractInvoiceXml_LegacyFileName () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_0_1_EN16931);
-    final byte [] aXml = HybridExtractor.extractInvoiceXml (HybridSource.fromFile (SamplePDFs.ZF_2_0_1_EN16931));
+    final byte [] aXml = HybridExtractor.extractInvoiceXml (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931));
     assertNotNull (aXml);
     assertTrue ("Expected non-empty XML", aXml.length > 0);
     // PDFBox returns the embedded bytes verbatim; XMLs from FeRD start with a UTF-8 XML declaration.
@@ -48,8 +47,7 @@ public final class HybridExtractorTest
   @Test
   public void testExtractInvoiceXml_FacturXFileName () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_4_BASIC_WL);
-    final byte [] aXml = HybridExtractor.extractInvoiceXml (HybridSource.fromFile (SamplePDFs.ZF_2_4_BASIC_WL));
+    final byte [] aXml = HybridExtractor.extractInvoiceXml (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_4_BASIC_WL));
     assertNotNull (aXml);
     assertTrue (aXml.length > 0);
   }
@@ -57,8 +55,7 @@ public final class HybridExtractorTest
   @Test
   public void testExtractInvoiceXml_XRechnungFileName () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_2_XRECHNUNG);
-    final byte [] aXml = HybridExtractor.extractInvoiceXml (HybridSource.fromFile (SamplePDFs.ZF_2_2_XRECHNUNG));
+    final byte [] aXml = HybridExtractor.extractInvoiceXml (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_2_XRECHNUNG));
     assertNotNull (aXml);
     assertTrue (aXml.length > 0);
   }
@@ -66,8 +63,7 @@ public final class HybridExtractorTest
   @Test
   public void testListAttachments_InvoiceFlaggedCorrectly () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_0_1_EN16931);
-    final ICommonsList <HybridAttachment> aAtts = HybridExtractor.listAttachments (HybridSource.fromFile (SamplePDFs.ZF_2_0_1_EN16931));
+    final ICommonsList <HybridAttachment> aAtts = HybridExtractor.listAttachments (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931));
     assertEquals (1, aAtts.size ());
     final HybridAttachment aAtt = aAtts.get (0);
     assertEquals ("zugferd-invoice.xml", aAtt.getName ());
@@ -79,8 +75,7 @@ public final class HybridExtractorTest
   @Test
   public void testExtractAttachmentByName () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_2_XRECHNUNG);
-    final byte [] aBytes = HybridExtractor.extractAttachment (HybridSource.fromFile (SamplePDFs.ZF_2_2_XRECHNUNG),
+    final byte [] aBytes = HybridExtractor.extractAttachment (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_2_XRECHNUNG),
                                                               "xrechnung.xml");
     assertNotNull (aBytes);
     assertTrue (aBytes.length > 0);
@@ -89,8 +84,7 @@ public final class HybridExtractorTest
   @Test
   public void testExtractAttachmentByName_NotFound () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_0_1_EN16931);
-    final byte [] aBytes = HybridExtractor.extractAttachment (HybridSource.fromFile (SamplePDFs.ZF_2_0_1_EN16931),
+    final byte [] aBytes = HybridExtractor.extractAttachment (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931),
                                                               "does-not-exist.xml");
     assertNull (aBytes);
   }

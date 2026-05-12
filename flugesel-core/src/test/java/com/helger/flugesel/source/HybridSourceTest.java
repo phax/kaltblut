@@ -148,4 +148,22 @@ public final class HybridSourceTest
     assertArrayEquals (aData, _readAll (aOut));
     assertArrayEquals (aData, _readAll (aOut));
   }
+
+  @Test
+  public void testFromClasspath () throws IOException
+  {
+    // Use one of the shipped sample PDFs from flugesel-testfiles. We do not check the exact bytes
+    // (the resource is potentially several MB) — only that the factory produces a re-readable
+    // source with a sensible size and name.
+    final IHybridSource aSource = HybridSource.fromClasspath ("external/zugferd/2.0.1/zugferd_2p0_EN16931_Einfach.pdf");
+    assertTrue (aSource.isReadMultiple ());
+    assertTrue ("PDF resource must have non-zero size", aSource.getSize () > 0);
+    assertTrue ("PDF bytes should start with %PDF", _readAll (aSource)[0] == (byte) '%');
+  }
+
+  @Test (expected = IOException.class)
+  public void testFromClasspathMissingThrows () throws IOException
+  {
+    HybridSource.fromClasspath ("external/does-not-exist.pdf");
+  }
 }

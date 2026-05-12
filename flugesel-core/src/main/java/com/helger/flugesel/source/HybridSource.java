@@ -173,6 +173,64 @@ public final class HybridSource
   }
 
   /**
+   * Create a re-readable source from a classpath resource. The resource is resolved via the given
+   * class's {@link Class#getResourceAsStream(String)}, which honours classloader scoping. The
+   * stream contents are materialised eagerly to memory.
+   *
+   * @param sResourcePath
+   *        the resource path, absolute (starting with {@code /}) or relative to the loader class.
+   * @param aLoader
+   *        the class whose classloader is used. May not be <code>null</code>.
+   * @return a re-readable hybrid source.
+   * @throws IOException
+   *         if the resource is not found or cannot be read.
+   */
+  @NonNull
+  public static IHybridSource fromClasspath (@NonNull final String sResourcePath,
+                                             @NonNull final Class <?> aLoader) throws IOException
+  {
+    ValueEnforcer.notNull (sResourcePath, "ResourcePath");
+    ValueEnforcer.notNull (aLoader, "Loader");
+    try (final InputStream aIS = aLoader.getResourceAsStream (sResourcePath))
+    {
+      if (aIS == null)
+        throw new IOException ("Classpath resource not found: " + sResourcePath);
+      final byte [] aBytes = StreamHelper.getAllBytes (aIS);
+      if (aBytes == null)
+        throw new IOException ("Failed to read classpath resource: " + sResourcePath);
+      return new ByteArrayHybridSource (aBytes, 0, aBytes.length, sResourcePath);
+    }
+  }
+
+  /**
+   * Create a re-readable source from a classpath resource resolved via the current thread's
+   * context classloader (falling back to the class loader of this class).
+   *
+   * @param sResourcePath
+   *        the resource path (must not start with {@code /}).
+   * @return a re-readable hybrid source.
+   * @throws IOException
+   *         if the resource is not found or cannot be read.
+   */
+  @NonNull
+  public static IHybridSource fromClasspath (@NonNull final String sResourcePath) throws IOException
+  {
+    ValueEnforcer.notNull (sResourcePath, "ResourcePath");
+    ClassLoader aCL = Thread.currentThread ().getContextClassLoader ();
+    if (aCL == null)
+      aCL = HybridSource.class.getClassLoader ();
+    try (final InputStream aIS = aCL.getResourceAsStream (sResourcePath))
+    {
+      if (aIS == null)
+        throw new IOException ("Classpath resource not found: " + sResourcePath);
+      final byte [] aBytes = StreamHelper.getAllBytes (aIS);
+      if (aBytes == null)
+        throw new IOException ("Failed to read classpath resource: " + sResourcePath);
+      return new ByteArrayHybridSource (aBytes, 0, aBytes.length, sResourcePath);
+    }
+  }
+
+  /**
    * Materialize an {@link InputStream} into a re-readable in-memory byte array source. The input
    * stream is closed after reading.
    *

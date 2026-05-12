@@ -27,7 +27,7 @@ import org.junit.Test;
 
 import com.helger.flugesel.model.ECountry;
 import com.helger.flugesel.source.HybridSource;
-import com.helger.flugesel.testutil.SamplePDFs;
+import com.helger.flugesel.testfiles.FlugeselTestFiles;
 
 public final class HybridValidatorTest
 {
@@ -41,13 +41,7 @@ public final class HybridValidatorTest
   @Test
   public void testRejectsNonHybridPdf () throws IOException
   {
-    // Anything that is not a hybrid invoice (here: a tiny stub) should fail BR-HYBRID-03.
-    // We use a real non-invoice PDF from docs/ that we know does not carry XMP.
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_0_1_EN16931);
-    // Strip the XML out by hand: just give the validator a non-PDF blob; it should fail to parse
-    // (Exception path) — that's not what we want. Use a different shape: simulate "PDF without XMP"
-    // by feeding a tiny invalid byte sequence and expect IOException OR a FATAL BR-HYBRID-03.
-    // Easier: pick a non-invoice PDF that *is* parseable. Take a docs-tree PDF that has no XMP block.
+    // A tiny hand-crafted PDF with no XMP / no embedded files must trigger BR-HYBRID-03.
     final ValidationResult aRes = _newValidator (ECountry.OTHER).validate (HybridSource.fromBytes (_pdfWithoutInvoiceXml ()));
     assertTrue ("Expected BR-HYBRID-03 fatal for non-hybrid PDF", aRes.hasFatalRule ("BR-HYBRID-03"));
   }
@@ -55,8 +49,7 @@ public final class HybridValidatorTest
   @Test
   public void testValidLegacyInvoice_NoFatalFindings () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_0_1_EN16931);
-    final ValidationResult aRes = _newValidator (ECountry.DE).validate (HybridSource.fromFile (SamplePDFs.ZF_2_0_1_EN16931));
+    final ValidationResult aRes = _newValidator (ECountry.DE).validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931));
     assertFalse ("Unexpected fatal findings: " + aRes.getFindings (ESeverity.FATAL), aRes.hasFatal ());
     assertTrue (aRes.isValid ());
   }
@@ -64,40 +57,35 @@ public final class HybridValidatorTest
   @Test
   public void testMinimumProfile_DE_TriggersBrHybridDe01 () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_3_MINIMUM);
-    final ValidationResult aRes = _newValidator (ECountry.DE).validate (HybridSource.fromFile (SamplePDFs.ZF_2_3_MINIMUM));
+    final ValidationResult aRes = _newValidator (ECountry.DE).validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_3_MINIMUM));
     assertTrue ("BR-HYBRID-DE-01 must fire for MINIMUM in DE", aRes.hasFatalRule ("BR-HYBRID-DE-01"));
   }
 
   @Test
   public void testMinimumProfile_FR_DoesNotTriggerBrHybridDe01 () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_3_MINIMUM);
-    final ValidationResult aRes = _newValidator (ECountry.FR).validate (HybridSource.fromFile (SamplePDFs.ZF_2_3_MINIMUM));
+    final ValidationResult aRes = _newValidator (ECountry.FR).validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_3_MINIMUM));
     assertFalse (aRes.hasRule ("BR-HYBRID-DE-01"));
   }
 
   @Test
   public void testBasicWlProfile_DE_TriggersBrHybridDe02 () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_4_BASIC_WL);
-    final ValidationResult aRes = _newValidator (ECountry.DE).validate (HybridSource.fromFile (SamplePDFs.ZF_2_4_BASIC_WL));
+    final ValidationResult aRes = _newValidator (ECountry.DE).validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_4_BASIC_WL));
     assertTrue ("BR-HYBRID-DE-02 must fire for BASIC WL in DE", aRes.hasFatalRule ("BR-HYBRID-DE-02"));
   }
 
   @Test
   public void testXRechnungProfile_FR_TriggersBrHybridFr01 () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_2_XRECHNUNG);
-    final ValidationResult aRes = _newValidator (ECountry.FR).validate (HybridSource.fromFile (SamplePDFs.ZF_2_2_XRECHNUNG));
+    final ValidationResult aRes = _newValidator (ECountry.FR).validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_2_XRECHNUNG));
     assertTrue ("BR-HYBRID-FR-01 must fire for XRECHNUNG in FR", aRes.hasFatalRule ("BR-HYBRID-FR-01"));
   }
 
   @Test
   public void testXRechnungProfile_DE_DoesNotTriggerBrHybridFr01 () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_2_XRECHNUNG);
-    final ValidationResult aRes = _newValidator (ECountry.DE).validate (HybridSource.fromFile (SamplePDFs.ZF_2_2_XRECHNUNG));
+    final ValidationResult aRes = _newValidator (ECountry.DE).validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_2_XRECHNUNG));
     assertFalse (aRes.hasRule ("BR-HYBRID-FR-01"));
   }
 
@@ -106,8 +94,7 @@ public final class HybridValidatorTest
   {
     // The shipped 2.2 XRECHNUNG sample uses fx:Version="2.1" instead of "1.0", which should produce
     // BR-HYBRID-10 as a Warning (not Fatal).
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_2_XRECHNUNG);
-    final ValidationResult aRes = _newValidator (ECountry.OTHER).validate (HybridSource.fromFile (SamplePDFs.ZF_2_2_XRECHNUNG));
+    final ValidationResult aRes = _newValidator (ECountry.OTHER).validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_2_XRECHNUNG));
     final Finding aF = aRes.findByRuleID ("BR-HYBRID-10");
     assertNotNull ("BR-HYBRID-10 must be reported when fx:Version != 1.0", aF);
     assertTrue (aF.getSeverity () == ESeverity.WARNING);
@@ -118,23 +105,19 @@ public final class HybridValidatorTest
   {
     // flugesel-core has no IPdfA3Validator on the classpath, so PDF/A-3 validation should produce
     // exactly one INFORMATION finding (rather than fatal-failing).
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_0_1_EN16931);
     final HybridValidator v = new HybridValidator ();
     v.getSettings ().setCountry (ECountry.OTHER).setCheckPdfA3 (true);
-    final ValidationResult aRes = v.validate (HybridSource.fromFile (SamplePDFs.ZF_2_0_1_EN16931));
+    final ValidationResult aRes = v.validate (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931));
     final Finding aF = aRes.findByRuleID ("FLUGESEL-PDFA-SPI-MISSING");
     assertNotNull ("Without veraPDF on classpath the validator must record an SPI-missing INFO finding", aF);
     assertTrue (aF.getSeverity () == ESeverity.INFORMATION);
   }
 
   /**
-   * Return the bytes of a minimal valid PDF (no XMP / no embedded files). Sourced inline so the test
-   * does not depend on docs/.
+   * Return the bytes of a minimal valid PDF (no XMP / no embedded files).
    */
   private static byte [] _pdfWithoutInvoiceXml ()
   {
-    // Hand-crafted minimal PDF 1.4 with a single empty page. Suitable for "is parseable but is
-    // definitely not a hybrid invoice" checks.
     final String sPdf = "%PDF-1.4\n" +
                         "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
                         "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +

@@ -24,11 +24,11 @@
     <artifactId>flugesel-parent-pom</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>flugesel-verapdf</artifactId>
+  <artifactId>flugesel-testfiles</artifactId>
   <packaging>jar</packaging>
-  <name>flugesel-verapdf</name>
-  <description>flugesel - PDF/A-3 validation adapter using veraPDF</description>
-  <url>https://github.com/phax/flugesel/flugesel-verapdf</url>
+  <name>flugesel-testfiles</name>
+  <description>flugesel - shared test fixtures (representative ZUGFeRD / Factur-X sample PDFs and a classpath-resource locator)</description>
+  <url>https://github.com/phax/flugesel/flugesel-testfiles</url>
   <inceptionYear>2026</inceptionYear>
 
   <licenses>
@@ -55,29 +55,8 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.helger.flugesel</groupId>
-      <artifactId>flugesel-core</artifactId>
-    </dependency>
-    <!--
-      Use the "-jakarta" artifact line published by veraPDF, which uses the modern jakarta.xml.bind
-      API (JAXB 4.x). This pairs with the jaxb-runtime version managed by the ph-commons BOM and
-      avoids dragging in the legacy javax.xml.bind 2.x line.
-    -->
-    <dependency>
-      <groupId>org.verapdf</groupId>
-      <artifactId>validation-model-jakarta</artifactId>
-      <version>${verapdf.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>com.helger.flugesel</groupId>
-      <artifactId>flugesel-testfiles</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-simple</artifactId>
-      <scope>test</scope>
+      <groupId>com.helger.commons</groupId>
+      <artifactId>ph-collection</artifactId>
     </dependency>
   </dependencies>
 </project>

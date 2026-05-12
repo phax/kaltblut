@@ -28,11 +28,11 @@ import com.helger.flugesel.model.EProfile;
 import com.helger.flugesel.model.EZugferdFlavor;
 import com.helger.flugesel.model.HybridMetadata;
 import com.helger.flugesel.source.HybridSource;
-import com.helger.flugesel.testutil.SamplePDFs;
+import com.helger.flugesel.testfiles.FlugeselTestFiles;
 
 /**
- * Integration-style tests for {@link HybridInspector} against real sample PDFs. One test per
- * distinct PDF-carrier generation captured in {@code docs/requirements/comparison.md}.
+ * Integration-style tests for {@link HybridInspector} against the representative samples shipped by
+ * flugesel-testfiles. One test per distinct PDF-carrier generation.
  *
  * @author Philip Helger
  */
@@ -41,8 +41,7 @@ public final class HybridInspectorTest
   @Test
   public void test_2_0_1_LegacyNamespace () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_0_1_EN16931);
-    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromFile (SamplePDFs.ZF_2_0_1_EN16931));
+    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931));
     assertTrue (aMeta.isRecognisedHybridInvoice ());
     assertEquals (EZugferdFlavor.ZUGFERD_2_0_LEGACY, aMeta.getFlavor ());
     assertEquals ("INVOICE", aMeta.getXmpDocumentType ());
@@ -55,8 +54,7 @@ public final class HybridInspectorTest
   @Test
   public void test_2_1_FacturxPrimary () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_1_EN16931_EMBEDDED);
-    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromFile (SamplePDFs.ZF_2_1_EN16931_EMBEDDED));
+    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_1_EN16931_EMBEDDED));
     assertTrue (aMeta.isRecognisedHybridInvoice ());
     assertEquals (EZugferdFlavor.FACTURX_PRIMARY, aMeta.getFlavor ());
     assertEquals ("factur-x.xml", aMeta.getXmpDocumentFileName ());
@@ -69,8 +67,7 @@ public final class HybridInspectorTest
   @Test
   public void test_2_2_XRechnungProfileAndFilename () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_2_XRECHNUNG);
-    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromFile (SamplePDFs.ZF_2_2_XRECHNUNG));
+    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_2_XRECHNUNG));
     assertEquals (EZugferdFlavor.FACTURX_PRIMARY, aMeta.getFlavor ());
     assertEquals (EProfile.XRECHNUNG, aMeta.getProfile ());
     // XRECHNUNG profile uses xrechnung.xml instead of factur-x.xml.
@@ -83,8 +80,7 @@ public final class HybridInspectorTest
   @Test
   public void test_2_3_MinimumProfileUsesDataRelationship () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_3_MINIMUM);
-    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromFile (SamplePDFs.ZF_2_3_MINIMUM));
+    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_3_MINIMUM));
     assertEquals (EProfile.MINIMUM, aMeta.getProfile ());
     assertEquals (EAFRelationship.DATA, aMeta.getAFRelationship ());
     assertEquals ("factur-x.xml", aMeta.getEmbeddedFileName ());
@@ -93,8 +89,7 @@ public final class HybridInspectorTest
   @Test
   public void test_2_4_LatestSpecParses () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_4_BASIC_WL);
-    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromFile (SamplePDFs.ZF_2_4_BASIC_WL));
+    final HybridMetadata aMeta = HybridInspector.readMetadata (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_4_BASIC_WL));
     assertEquals (EZugferdFlavor.FACTURX_PRIMARY, aMeta.getFlavor ());
     assertEquals (EProfile.BASIC_WL, aMeta.getProfile ());
     assertEquals (EAFRelationship.DATA, aMeta.getAFRelationship ());
@@ -104,7 +99,6 @@ public final class HybridInspectorTest
   @Test
   public void testIsHybridInvoiceShortcut () throws IOException
   {
-    SamplePDFs.assumeAvailable (SamplePDFs.ZF_2_0_1_EN16931);
-    assertTrue (HybridInspector.isHybridInvoice (HybridSource.fromFile (SamplePDFs.ZF_2_0_1_EN16931)));
+    assertTrue (HybridInspector.isHybridInvoice (HybridSource.fromClasspath (FlugeselTestFiles.ZF_2_0_1_EN16931)));
   }
 }
