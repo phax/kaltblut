@@ -281,7 +281,7 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
-v0.9.1 - upcoming
+v0.9.1 - 2026-05-13
 * Validation: the result of `HybridValidator.validate` is now structured as a list of
   `HybridValidationLayer`s (`BR_HYBRID` + optional `PDF_A3`, identified by
   `EHybridValidationLayerKind`) instead of a flat finding list. Each layer carries its own findings
