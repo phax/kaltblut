@@ -16,7 +16,6 @@
  */
 package com.helger.kaltblut.verapdf;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -33,6 +32,7 @@ import org.verapdf.pdfa.results.TestAssertion.Status;
 import org.verapdf.pdfa.results.ValidationResult;
 
 import com.helger.annotation.style.IsSPIImplementation;
+import com.helger.base.io.nonblocking.NonBlockingByteArrayInputStream;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.kaltblut.core.source.IHybridSource;
@@ -84,7 +84,7 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
     _ensureInitialised ();
 
     final ICommonsList <HybridFinding> aOut = new CommonsArrayList <> ();
-    try (final InputStream aIS = new ByteArrayInputStream (aSource.getBytes ()))
+    try (final InputStream aIS = new NonBlockingByteArrayInputStream (aSource.getBytes ()))
     {
       try (final PDFAParser aParser = Foundries.defaultInstance ().createParser (aIS, PDFAFlavour.NO_FLAVOUR))
       {

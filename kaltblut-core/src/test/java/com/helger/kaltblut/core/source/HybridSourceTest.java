@@ -22,7 +22,6 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -30,6 +29,8 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 
 import org.junit.Test;
+
+import com.helger.base.io.nonblocking.NonBlockingByteArrayInputStream;
 
 /**
  * Test class for class {@link HybridSource}.
@@ -103,7 +104,7 @@ public final class HybridSourceTest
   public void testFromInputStream () throws IOException
   {
     final byte [] aData = "stream".getBytes ();
-    final IHybridSource aSource = HybridSource.fromInputStream (new ByteArrayInputStream (aData));
+    final IHybridSource aSource = HybridSource.fromInputStream (new NonBlockingByteArrayInputStream (aData));
     assertArrayEquals (aData, aSource.getBytes ());
     // Calling getBytes() again returns the same materialised array.
     assertSame (aSource.getBytes (), aSource.getBytes ());
