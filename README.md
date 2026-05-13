@@ -4,7 +4,7 @@ A Java toolkit for working with **ZUGFeRD / Factur-X** hybrid invoices: detect t
 hybrid PDF, extract the embedded XML and supporting attachments, and validate the carrier-side
 specification rules — including PDF/A-3 conformance via [veraPDF](https://verapdf.org/).
 
-XML-side business rules (cardinalities, EN 16931 rules, code lists, …) are out of scope for this
+XML-side business rules (cardinalities, EN 16931 rules, code lists ...) are out of scope for this
 project; use [phive-rules-zugferd](https://github.com/phax/phive-rules) for those.
 
 Per-version requirements analysis used to design this library lives under
@@ -31,7 +31,7 @@ The detection table covers every published release since 2014:
 
 ## Why "FlugEsel"?
 
-This project's name is a playful nod to ZUGFeRD, the German e-invoicing formatd it works with.
+This project's name is a playful nod to ZUGFeRD, the German e-invoicing format it works with.
 
 In German, ZUGFeRD sounds like "Zugpferd" — literally a draft horse, the workhorse that pulls a carriage.
   Fitting, since the standard is meant to be a reliable workhorse of electronic invoicing in Germany.
