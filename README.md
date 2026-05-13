@@ -31,7 +31,11 @@ The detection table covers every published release since 2014:
 
 ## Why "Kaltblut"?
 
-<!-- TODO: write the "Why Kaltblut" section -->
+**Kaltblut** is German for the family of heavy draft horse breeds — the strongest and steadiest of the *Zugpferde*.
+The name is a nod to ZUGFeRD, which German speakers hear as Zugpferd ("draft horse").
+Kaltblut picks the most workmanlike of them: built to pull heavy loads calmly and reliably, much like this toolkit aims to handle ZUGFeRD invoices.
+
+As a bonus, *kaltblütig* in everyday German also means "cool-headed" — a useful trait for any library dealing with tax-relevant invoice processing
 
 ## What Kaltblut Does (and Does Not Do)
 
@@ -151,7 +155,7 @@ PDF/A-3 conformance was not checked.
 
 Build the standalone fat JAR and run it:
 
-```bash
+```shell
 mvn clean package
 java -jar kaltblut-cli/target/kaltblut-cli-full.jar [subcommand] [options] <files...>
 ```
@@ -179,7 +183,7 @@ Common options:
 
 Examples:
 
-```bash
+```shell
 # Detect the flavor of one or more PDFs
 java -jar kaltblut-cli-full.jar inspect invoice.pdf another-invoice.pdf
 
@@ -200,7 +204,7 @@ java -jar kaltblut-cli-full.jar validate --no-pdfa invoice.pdf
 
 Requires Java 17+ and Maven.
 
-```bash
+```shell
 mvn clean package
 ```
 
@@ -242,10 +246,10 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
-v0.9.0 - 2026-05-12 (in development)
+v0.9.0 - work in progress
 * Detection: recognises all five XMP extension-schema namespaces seen across ZUGFeRD 1.0, 2.0.1, 2.1, 2.2, 2.3, 2.3.2, 2.3.3 and 2.4.
 * Extraction: invoice XML, named attachments, full attachment list including Modification Date and MIME type.
 * Validation: BR-HYBRID-01 through BR-HYBRID-15 (and the BR-HYBRID-DE-*/-FR-* country
   variants) plus PDF/A-3 conformance via the `IPdfA3ValidatorSPI` SPI implemented by
-  `kaltblut-verapdf` using veraPDF 1.28.1 (`-jakarta` artifact line, JAXB 4.x only).
+  `kaltblut-verapdf` using veraPDF (`-jakarta` artifact line, JAXB 4.x only).
 * Command-line client with subcommands `inspect`, `extract`, `attachments`, `validate`.
