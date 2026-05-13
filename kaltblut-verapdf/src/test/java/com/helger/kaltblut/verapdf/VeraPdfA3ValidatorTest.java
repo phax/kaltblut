@@ -31,7 +31,7 @@ import com.helger.kaltblut.core.validate.EHybridSeverity;
 import com.helger.kaltblut.core.validate.HybridFinding;
 import com.helger.kaltblut.core.validate.HybridValidator;
 import com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI;
-import com.helger.kaltblut.core.validate.ValidationResult;
+import com.helger.kaltblut.core.validate.HybridValidationResult;
 import com.helger.kaltblut.testfiles.KaltblutTestFiles;
 
 /**
@@ -73,11 +73,11 @@ public final class VeraPdfA3ValidatorTest
   {
     final HybridValidator v = new HybridValidator ();
     v.getSettings ().setCountry (EZugferdCountry.OTHER).setCheckPdfA3 (true);
-    final ValidationResult aRes = v.validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_0_1_EN16931));
+    final HybridValidationResult aRes = v.validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_0_1_EN16931));
     // With kaltblut-verapdf on the classpath, no SPI-missing INFO finding should be present.
     assertTrue (!aRes.hasRule ("KALTBLUT-PDFA-SPI-MISSING"));
     // Validator must complete and produce at least the BR-HYBRID-01 informational finding.
     assertNotNull (aRes.findByRuleID ("BR-HYBRID-01"));
-    assertNotNull (aRes.getFindings (EHybridSeverity.FATAL));
+    assertNotNull (aRes.getFindings (EHybridSeverity.ERROR));
   }
 }

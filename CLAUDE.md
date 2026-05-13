@@ -73,7 +73,7 @@ Package map under `com.helger.kaltblut.core`:
 | `pdfbox`   | `HybridDocument` — internal PDFBox 3 wrapper that opens the PDF once and exposes XMP + `/AF` data. The only package that touches `org.apache.pdfbox.*`. |
 | `inspect`  | Tier 1 — `HybridInspector` (flavor detection + XMP metadata).                              |
 | `extract`  | Tier 2 — `HybridExtractor` (invoice XML, named attachment, full attachment list).          |
-| `validate` | Tier 3 — `HybridValidator`, `HybridValidatorSettings`, `ValidationResult`, `HybridFinding`, `EHybridSeverity`, `IPdfA3ValidatorSPI`. |
+| `validate` | Tier 3 — `HybridValidator`, `HybridValidatorSettings`, `HybridValidationResult`, `HybridFinding`, `EHybridSeverity`, `IPdfA3ValidatorSPI`. |
 
 Conceptual flow: caller builds an `IHybridSource` (one of seven factories on `HybridSource` —
 file / path / bytes / ByteBuffer / URL / InputStream / classpath), then passes it to an

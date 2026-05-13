@@ -16,30 +16,67 @@
  */
 package com.helger.kaltblut.core.validate;
 
+import java.time.Duration;
+
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.tostring.ToStringGenerator;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 
 /**
- * Aggregated result of a {@link HybridValidator#validate} run. Carries the ordered list of
- * {@link HybridFinding}s and convenience predicates for the caller.
+ * One logical layer of a {@link HybridValidator} run: a {@link EHybridValidationLayerKind kind}, the
+ * wall-clock duration of that layer, and its ordered {@link HybridFinding}s.
  *
  * @author Philip Helger
+ * @since 0.9.1
  */
 @Immutable
-public final class ValidationResult
+public final class HybridValidationLayer
 {
+  private final EHybridValidationLayerKind m_eKind;
+  private final Duration m_aDuration;
   private final ICommonsList <HybridFinding> m_aFindings;
 
-  public ValidationResult (@NonNull final ICommonsList <HybridFinding> aFindings)
+  public HybridValidationLayer (@NonNull final EHybridValidationLayerKind eKind,
+                                @NonNull final Duration aDuration,
+                                @NonNull final ICommonsList <HybridFinding> aFindings)
   {
+    ValueEnforcer.notNull (eKind, "Kind");
+    ValueEnforcer.notNull (aDuration, "Duration");
     ValueEnforcer.notNull (aFindings, "Findings");
+    m_eKind = eKind;
+    m_aDuration = aDuration;
     m_aFindings = aFindings.getClone ();
+  }
+
+  @NonNull
+  public EHybridValidationLayerKind getKind ()
+  {
+    return m_eKind;
+  }
+
+  /**
+   * @return Display name for this layer (e.g. for UI / log output). Equivalent to
+   *         <code>getKind().getName()</code>.
+   */
+  @NonNull
+  public String getDisplayName ()
+  {
+    return m_eKind.getName ();
+  }
+
+  /**
+   * @return wall-clock duration of this layer's validation execution.
+   */
+  @NonNull
+  public Duration getDuration ()
+  {
+    return m_aDuration;
   }
 
   @NonNull
@@ -61,16 +98,25 @@ public final class ValidationResult
     return aOut;
   }
 
-  /** @return <code>true</code> iff there is at least one {@link EHybridSeverity#FATAL} finding. */
-  public boolean hasFatal ()
+  public int getFindingCount ()
+  {
+    return m_aFindings.size ();
+  }
+
+  /**
+   * @return <code>true</code> if there is at least one {@link EHybridSeverity#ERROR} finding.
+   */
+  public boolean hasError ()
   {
     for (final HybridFinding aF : m_aFindings)
-      if (aF.getSeverity () == EHybridSeverity.FATAL)
+      if (aF.getSeverity () == EHybridSeverity.ERROR)
         return true;
     return false;
   }
 
-  /** @return <code>true</code> iff there is at least one {@link EHybridSeverity#WARNING} finding. */
+  /**
+   * @return <code>true</code> if there is at least one {@link EHybridSeverity#WARNING} finding.
+   */
   public boolean hasWarning ()
   {
     for (final HybridFinding aF : m_aFindings)
@@ -79,24 +125,14 @@ public final class ValidationResult
     return false;
   }
 
-  /** @return <code>true</code> iff no fatal findings were recorded. */
+  /**
+   * @return <code>true</code> if no FATAL finding was recorded on this layer.
+   */
   public boolean isValid ()
   {
-    return !hasFatal ();
+    return !hasError ();
   }
 
-  public int getFindingCount ()
-  {
-    return m_aFindings.size ();
-  }
-
-  /**
-   * Find the first finding with the given rule identifier.
-   *
-   * @param sRuleID
-   *        the rule identifier to look for. May not be <code>null</code>.
-   * @return the first matching finding, or <code>null</code>.
-   */
   @Nullable
   public HybridFinding findByRuleID (@NonNull final String sRuleID)
   {
@@ -107,27 +143,27 @@ public final class ValidationResult
     return null;
   }
 
-  /**
-   * @param sRuleID
-   *        the rule identifier to look for. May not be <code>null</code>.
-   * @return <code>true</code> if at least one finding matches the given rule identifier.
-   */
   public boolean hasRule (@NonNull final String sRuleID)
   {
     return findByRuleID (sRuleID) != null;
   }
 
-  /**
-   * @param sRuleID
-   *        the rule identifier to look for. May not be <code>null</code>.
-   * @return <code>true</code> if at least one finding matches and has {@link EHybridSeverity#FATAL} severity.
-   */
-  public boolean hasFatalRule (@NonNull final String sRuleID)
+  public boolean hasErrorRule (@NonNull final String sRuleID)
   {
     ValueEnforcer.notNull (sRuleID, "RuleID");
     for (final HybridFinding aF : m_aFindings)
-      if (aF.getSeverity () == EHybridSeverity.FATAL && sRuleID.equals (aF.getRuleID ()))
+      if (aF.getSeverity () == EHybridSeverity.ERROR && sRuleID.equals (aF.getRuleID ()))
         return true;
     return false;
+  }
+
+  @Override
+  @NonNull
+  public String toString ()
+  {
+    return new ToStringGenerator (null).append ("Kind", m_eKind)
+                                       .append ("Duration", m_aDuration)
+                                       .append ("Findings", m_aFindings)
+                                       .getToString ();
   }
 }

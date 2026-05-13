@@ -28,7 +28,8 @@ import com.helger.kaltblut.core.source.HybridSource;
 import com.helger.kaltblut.core.source.IHybridSource;
 import com.helger.kaltblut.core.validate.HybridFinding;
 import com.helger.kaltblut.core.validate.HybridValidator;
-import com.helger.kaltblut.core.validate.ValidationResult;
+import com.helger.kaltblut.core.validate.HybridValidationLayer;
+import com.helger.kaltblut.core.validate.HybridValidationResult;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -36,7 +37,7 @@ import picocli.CommandLine.Parameters;
 
 @Command (name = "validate",
           description = "Run BR-HYBRID-* business rules and (optionally) PDF/A-3 validation against each input PDF. " +
-                        "Exit code is 0 iff no FATAL findings are reported.")
+                        "Exit code is 0 if no ERROR findings are reported.")
 public final class ValidateCommand implements Callable <Integer>
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (ValidateCommand.class);
@@ -65,17 +66,17 @@ public final class ValidateCommand implements Callable <Integer>
   @Override
   public Integer call ()
   {
-    int nFatal = 0;
+    int nError = 0;
     int nWarn = 0;
     int nInfo = 0;
-    int nFatalFiles = 0;
+    int nErrorFiles = 0;
     for (final String sPath : m_aFiles)
     {
       final File aFile = new File (sPath).getAbsoluteFile ();
       if (!aFile.isFile () || !aFile.canRead ())
       {
         LOGGER.error ("Cannot read PDF '" + aFile.getAbsolutePath () + "'");
-        nFatalFiles++;
+        nErrorFiles++;
         continue;
       }
       try
@@ -85,35 +86,39 @@ public final class ValidateCommand implements Callable <Integer>
         aValidator.getSettings ().setCountry (m_eCountry);
         aValidator.getSettings ().setCheckPdfA3 (!m_bNoPdfA);
         aValidator.getSettings ().setApplyDePdfADowngrade (!m_bNoDeDowngrade);
-        final ValidationResult aRes = aValidator.validate (aSource);
+        final HybridValidationResult aRes = aValidator.validate (aSource);
         System.out.println ("File: " + aFile.getName () + "  (" + aRes.getFindingCount () + " finding(s))");
-        for (final HybridFinding aF : aRes.getAllFindings ())
+        for (final HybridValidationLayer aLayer : aRes.getAllLayers ())
         {
-          System.out.println ("  " + aF);
-          switch (aF.getSeverity ())
+          System.out.println ("  [" +
+                              aLayer.getDisplayName () +
+                              "]  " +
+                              aLayer.getFindingCount () +
+                              " finding(s) in " +
+                              aLayer.getDuration ().toMillis () +
+                              "ms");
+          for (final HybridFinding aF : aLayer.getAllFindings ())
           {
-            case FATAL:
-              nFatal++;
-              break;
-            case WARNING:
-              nWarn++;
-              break;
-            case INFORMATION:
-            default:
-              nInfo++;
-              break;
+            System.out.println ("    " + aF);
+            switch (aF.getSeverity ())
+            {
+              case ERROR -> nError++;
+              case WARNING -> nWarn++;
+              case INFORMATION -> nInfo++;
+              default -> nInfo++;
+            }
           }
         }
-        if (aRes.hasFatal ())
-          nFatalFiles++;
+        if (aRes.hasError ())
+          nErrorFiles++;
       }
       catch (final Exception ex)
       {
         LOGGER.error ("Failed to validate '" + aFile.getAbsolutePath () + "': " + ex.getMessage ());
-        nFatalFiles++;
+        nErrorFiles++;
       }
     }
-    LOGGER.info ("Total: " + nFatal + " fatal, " + nWarn + " warning(s), " + nInfo + " info.");
-    return Integer.valueOf (nFatalFiles > 0 ? 1 : 0);
+    LOGGER.info ("Total: " + nError + " error(s), " + nWarn + " warning(s), " + nInfo + " info.");
+    return Integer.valueOf (nErrorFiles > 0 ? 1 : 0);
   }
 }

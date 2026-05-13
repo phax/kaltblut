@@ -17,6 +17,7 @@
 package com.helger.kaltblut.core.validate;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ServiceLoader;
 
 import org.jspecify.annotations.NonNull;
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.concurrent.NotThreadSafe;
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.timing.StopWatch;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.kaltblut.core.model.EAFRelationship;
@@ -77,31 +79,37 @@ public final class HybridValidator
    *         on I/O failure.
    */
   @NonNull
-  public ValidationResult validate (@NonNull final IHybridSource aSource) throws IOException
+  public HybridValidationResult validate (@NonNull final IHybridSource aSource) throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
 
-    final ICommonsList <HybridFinding> aFindings = new CommonsArrayList <> ();
-    HybridMetadata aMeta = null;
-    ICommonsList <HybridAttachment> aAttachments = new CommonsArrayList <> ();
-    boolean bXmlExtractable = false;
+    final ICommonsList <HybridValidationLayer> aLayers = new CommonsArrayList <> ();
 
+    // Layer 1: BR-HYBRID business rules
+    final ICommonsList <HybridFinding> aBrHybridFindings = new CommonsArrayList <> ();
+    boolean bXmlExtractable = false;
+    final StopWatch aSwBrHybrid = StopWatch.createdStarted ();
     try (final HybridDocument aDoc = HybridDocument.open (aSource, m_aSettings.getLimits ()))
     {
-      aMeta = aDoc.readMetadata ();
-      aAttachments = aDoc.listAttachments ();
+      final HybridMetadata aMeta = aDoc.readMetadata ();
+      final ICommonsList <HybridAttachment> aAttachments = aDoc.listAttachments ();
       for (final HybridAttachment aAtt : aAttachments)
         if (aAtt.isInvoiceXml () && aAtt.getSize () > 0)
         {
           bXmlExtractable = true;
           break;
         }
-      _applyBrHybrid (aFindings, aMeta);
+      _applyBrHybrid (aBrHybridFindings, aMeta);
     }
+    aSwBrHybrid.stop ();
+    aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.BR_HYBRID,
+                                      Duration.ofMillis (aSwBrHybrid.getMillis ()),
+                                      aBrHybridFindings));
 
-    // PDF/A-3 (optional)
+    // Layer 2: PDF/A-3 (optional)
     if (m_aSettings.isCheckPdfA3 ())
     {
+      final StopWatch aSwPdfA = StopWatch.createdStarted ();
       ICommonsList <HybridFinding> aPdfAFindings = _runPdfA3 (aSource);
       // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
       if (m_aSettings.isApplyDePdfADowngrade () &&
@@ -112,13 +120,16 @@ public final class HybridValidator
       {
         final ICommonsList <HybridFinding> aDowngraded = new CommonsArrayList <> ();
         for (final HybridFinding aF : aPdfAFindings)
-          aDowngraded.add (aF.getSeverity () == EHybridSeverity.FATAL ? aF.withSeverity (EHybridSeverity.WARNING) : aF);
+          aDowngraded.add (aF.getSeverity () == EHybridSeverity.ERROR ? aF.withSeverity (EHybridSeverity.WARNING) : aF);
         aPdfAFindings = aDowngraded;
       }
-      aFindings.addAll (aPdfAFindings);
+      aSwPdfA.stop ();
+      aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.PDF_A3,
+                                        Duration.ofMillis (aSwPdfA.getMillis ()),
+                                        aPdfAFindings));
     }
 
-    return new ValidationResult (aFindings);
+    return new HybridValidationResult (aLayers);
   }
 
   // ===================== BR-HYBRID rules =====================
@@ -138,7 +149,7 @@ public final class HybridValidator
     if (eFlavor == null)
     {
       aOut.add (new HybridFinding ("BR-HYBRID-03",
-                                   EHybridSeverity.FATAL,
+                                   EHybridSeverity.ERROR,
                                    "No recognised ZUGFeRD / Factur-X XMP extension schema was found. " +
                                                           "The PDF does not appear to be a hybrid invoice.",
                                    null));
@@ -169,13 +180,13 @@ public final class HybridValidator
     final String sDocType = aMeta.getXmpDocumentType ();
     if (sDocType == null)
       aOut.add (new HybridFinding ("BR-HYBRID-06",
-                                   EHybridSeverity.FATAL,
+                                   EHybridSeverity.ERROR,
                                    "XMP DocumentType is missing. Expected 'INVOICE'.",
                                    "/Metadata"));
     else
       if (!"INVOICE".equals (sDocType))
         aOut.add (new HybridFinding ("BR-HYBRID-06",
-                                     EHybridSeverity.FATAL,
+                                     EHybridSeverity.ERROR,
                                      "XMP DocumentType '" +
                                                             sDocType +
                                                             "' is not from the HybridDocumentType code list (expected 'INVOICE').",
@@ -186,13 +197,13 @@ public final class HybridValidator
     final String sRawProfile = aMeta.getRawProfile ();
     if (sRawProfile == null)
       aOut.add (new HybridFinding ("BR-HYBRID-07",
-                                   EHybridSeverity.FATAL,
+                                   EHybridSeverity.ERROR,
                                    "XMP ConformanceLevel is missing.",
                                    "/Metadata"));
     else
       if (eProfile == null)
         aOut.add (new HybridFinding ("BR-HYBRID-07",
-                                     EHybridSeverity.FATAL,
+                                     EHybridSeverity.ERROR,
                                      "XMP ConformanceLevel '" +
                                                             sRawProfile +
                                                             "' is not from the HybridConformanceType code list.",
@@ -202,13 +213,13 @@ public final class HybridValidator
     final String sXmpFileName = aMeta.getXmpDocumentFileName ();
     if (sXmpFileName == null)
       aOut.add (new HybridFinding ("BR-HYBRID-08",
-                                   EHybridSeverity.FATAL,
+                                   EHybridSeverity.ERROR,
                                    "XMP DocumentFileName is missing.",
                                    "/Metadata"));
     else
       if (!_isInFilenameCodelist (sXmpFileName))
         aOut.add (new HybridFinding ("BR-HYBRID-08",
-                                     EHybridSeverity.FATAL,
+                                     EHybridSeverity.ERROR,
                                      "XMP DocumentFileName '" +
                                                             sXmpFileName +
                                                             "' is not from the HybridDocumentFilename code list.",
@@ -218,7 +229,7 @@ public final class HybridValidator
     // BR-HYBRID-10 (Warning): Version SHOULD be 1.0.
     final String sVersion = aMeta.getXmpVersion ();
     if (sVersion == null)
-      aOut.add (new HybridFinding ("BR-HYBRID-09", EHybridSeverity.FATAL, "XMP Version is missing.", "/Metadata"));
+      aOut.add (new HybridFinding ("BR-HYBRID-09", EHybridSeverity.ERROR, "XMP Version is missing.", "/Metadata"));
     else
       if (!"1.0".equals (sVersion))
         aOut.add (new HybridFinding ("BR-HYBRID-10",
@@ -246,7 +257,7 @@ public final class HybridValidator
     // know whether the AF entry is reachable.
     if (aMeta.getEmbeddedFileName () == null)
       aOut.add (new HybridFinding ("BR-HYBRID-12",
-                                   EHybridSeverity.FATAL,
+                                   EHybridSeverity.ERROR,
                                    "No associated invoice file was found on /Catalog/AF. The XML cannot be reliably extracted.",
                                    "/Catalog/AF"));
 
@@ -254,7 +265,7 @@ public final class HybridValidator
     final String sEmbName = aMeta.getEmbeddedFileName ();
     if (sEmbName != null && !_isInFilenameCodelist (sEmbName))
       aOut.add (new HybridFinding ("BR-HYBRID-13",
-                                   EHybridSeverity.FATAL,
+                                   EHybridSeverity.ERROR,
                                    "Embedded file name '" +
                                                           sEmbName +
                                                           "' is not from the HybridDocumentFilename code list.",
@@ -287,19 +298,19 @@ public final class HybridValidator
     {
       if (eProfile == EZugferdProfile.MINIMUM)
         aOut.add (new HybridFinding ("BR-HYBRID-DE-01",
-                                     EHybridSeverity.FATAL,
+                                     EHybridSeverity.ERROR,
                                      "MINIMUM profile is not permitted for DE↔DE invoices.",
                                      null));
       if (eProfile == EZugferdProfile.BASIC_WL)
         aOut.add (new HybridFinding ("BR-HYBRID-DE-02",
-                                     EHybridSeverity.FATAL,
+                                     EHybridSeverity.ERROR,
                                      "BASIC WL profile is not permitted for DE↔DE invoices.",
                                      null));
     }
     // BR-HYBRID-FR-01 (Fatal): XRECHNUNG must not be used FR↔FR.
     if (m_aSettings.getCountry () == EZugferdCountry.FR && eProfile == EZugferdProfile.XRECHNUNG)
       aOut.add (new HybridFinding ("BR-HYBRID-FR-01",
-                                   EHybridSeverity.FATAL,
+                                   EHybridSeverity.ERROR,
                                    "XRECHNUNG reference profile is not permitted for FR↔FR invoices.",
                                    null));
   }

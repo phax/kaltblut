@@ -16,18 +16,49 @@
  */
 package com.helger.kaltblut.core.model;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+import com.helger.base.id.IHasID;
+import com.helger.base.lang.EnumHelper;
+
 /**
- * Country context used to gate Factur-X / ZUGFeRD country-specific business rules
- * (BR-HYBRID-DE-*, BR-HYBRID-FR-*, BR-FX-DE-*).
+ * Country context used to gate Factur-X / ZUGFeRD country-specific business rules (BR-HYBRID-DE-*,
+ * BR-HYBRID-FR-*, BR-FX-DE-*).
  *
  * @author Philip Helger
  */
-public enum EZugferdCountry
+public enum EZugferdCountry implements IHasID <String>
 {
   /** Germany. Activates BR-HYBRID-DE-* and BR-FX-DE-* rules and the PDF/A-3 error downgrade. */
-  DE,
+  DE ("DE"),
   /** France. Activates BR-HYBRID-FR-* rules. */
-  FR,
+  FR ("FR"),
   /** Any other country, or auto-detection failed. Country-specific rules do not fire. */
-  OTHER
+  OTHER ("OTHER");
+
+  private final String m_sID;
+
+  EZugferdCountry (@NonNull final String sID)
+  {
+    m_sID = sID;
+  }
+
+  @NonNull
+  public String getID ()
+  {
+    return m_sID;
+  }
+
+  @Nullable
+  public static EZugferdCountry getFromIDOrNull (@Nullable final String sID)
+  {
+    return EnumHelper.getFromIDOrNull (EZugferdCountry.class, sID);
+  }
+
+  @Nullable
+  public static EZugferdCountry getFromIDOrDefault (@Nullable final String sID, @Nullable final EZugferdCountry eDefault)
+  {
+    return EnumHelper.getFromIDOrDefault (EZugferdCountry.class, sID, eDefault);
+  }
 }

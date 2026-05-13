@@ -92,7 +92,7 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
         if (!_isAcceptable (eDetected))
         {
           aOut.add (new HybridFinding ("VERAPDF-FLAVOUR",
-                                       EHybridSeverity.FATAL,
+                                       EHybridSeverity.ERROR,
                                        "PDF/A flavor '" +
                                                               eDetected +
                                                               "' is not acceptable for a hybrid invoice. " +
@@ -110,13 +110,13 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
                                            aTA.getRuleId ().getClause () +
                                            "-" +
                                            aTA.getRuleId ().getTestNumber (),
-                                           EHybridSeverity.FATAL,
+                                           EHybridSeverity.ERROR,
                                            aTA.getMessage (),
                                            aTA.getLocation () != null ? aTA.getLocation ().getContext () : null));
 
           if (aOut.isEmpty () && !aRes.isCompliant ())
             aOut.add (new HybridFinding ("VERAPDF",
-                                         EHybridSeverity.FATAL,
+                                         EHybridSeverity.ERROR,
                                          "PDF/A validation reported non-compliance but produced no detailed assertions.",
                                          null));
         }

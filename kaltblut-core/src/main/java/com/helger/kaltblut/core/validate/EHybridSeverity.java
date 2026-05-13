@@ -16,23 +16,45 @@
  */
 package com.helger.kaltblut.core.validate;
 
+import org.jspecify.annotations.NonNull;
+
+import com.helger.diagnostics.error.level.EErrorLevel;
+
 /**
  * Severity classification for {@link HybridFinding}s. Matches the levels used by the Factur-X
- * BR-HYBRID-* rule block.
+ * BR-HYBRID-* rule block. Each entry carries the equivalent ph-commons {@link EErrorLevel} so
+ * consumers can map findings into ph-commons error infrastructure without translation tables.
  *
  * @author Philip Helger
  */
 public enum EHybridSeverity
 {
   /** Informational finding, no impact on validity. */
-  INFORMATION,
+  INFORMATION (EErrorLevel.INFO),
   /** Warning: indicates a deviation that does not invalidate the invoice. */
-  WARNING,
-  /** Fatal: the invoice does not comply with the specification. */
-  FATAL;
+  WARNING (EErrorLevel.WARN),
+  /** Error: the invoice does not comply with the specification. */
+  ERROR (EErrorLevel.ERROR);
 
-  public boolean isFatal ()
+  private final EErrorLevel m_eErrorLevel;
+
+  EHybridSeverity (@NonNull final EErrorLevel eErrorLevel)
   {
-    return this == FATAL;
+    m_eErrorLevel = eErrorLevel;
+  }
+
+  /**
+   * @return the equivalent ph-commons {@link EErrorLevel} for this severity. Never
+   *         <code>null</code>.
+   */
+  @NonNull
+  public EErrorLevel getErrorLevel ()
+  {
+    return m_eErrorLevel;
+  }
+
+  public boolean isError ()
+  {
+    return this == ERROR;
   }
 }

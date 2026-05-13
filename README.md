@@ -157,7 +157,8 @@ by default. Otherwise a malicious invoice can XXE-read local files or trigger SS
 import com.helger.kaltblut.core.model.EZugferdCountry;
 import com.helger.kaltblut.core.validate.HybridFinding;
 import com.helger.kaltblut.core.validate.HybridValidator;
-import com.helger.kaltblut.core.validate.ValidationResult;
+import com.helger.kaltblut.core.validate.HybridValidationLayer;
+import com.helger.kaltblut.core.validate.HybridValidationResult;
 
 HybridValidator aValidator = new HybridValidator ();
 aValidator.getSettings ()
@@ -165,10 +166,20 @@ aValidator.getSettings ()
           .setCheckPdfA3 (true)
           .setApplyDePdfADowngrade (true);
 
-ValidationResult aResult = aValidator.validate (aSource);
+HybridValidationResult aResult = aValidator.validate (aSource);
+
+// Per-layer reporting: one BR_HYBRID layer + (when enabled) one PDF_A3 layer, each
+// carrying its own findings and wall-clock duration.
+for (HybridValidationLayer aLayer : aResult.getAllLayers ())
+{
+  System.out.println (aLayer.getDisplayName () + " - " + aLayer.getDuration ().toMillis () + "ms");
+  for (HybridFinding aF : aLayer.getAllFindings ())
+    System.out.println ("  " + aF);
+}
+
+// Aggregate predicates still work across all layers.
 if (!aResult.isValid ())
-  for (HybridFinding aF : aResult.getFindings (com.helger.kaltblut.core.validate.EHybridSeverity.FATAL))
-    System.out.println (aF);
+  System.err.println ("Document considered invalid");
 ```
 
 PDF/A-3 validation runs via the `IPdfA3ValidatorSPI` SPI. Add `kaltblut-verapdf` to the classpath
@@ -191,7 +202,7 @@ Subcommands:
 | `inspect`     | Print flavor, profile, XMP fields, embedded-file name, and `/AFRelationship`.        |
 | `extract`     | Write the embedded invoice XML to disk.                                              |
 | `attachments` | List all embedded files (invoice XML + supporting documents).                        |
-| `validate`    | Run BR-HYBRID-* business rules and PDF/A-3 validation. Exit code 0 iff no fatal findings. |
+| `validate`    | Run BR-HYBRID-* business rules and PDF/A-3 validation. Exit code 0 if no ERROR findings. |
 
 Common options:
 
@@ -269,6 +280,24 @@ discovered via `ServiceLoader`; only the first implementation found is used.
 Apache License, Version 2.0.
 
 ## News and Noteworthy
+
+v0.9.1 - upcoming
+* Validation: the result of `HybridValidator.validate` is now structured as a list of
+  `HybridValidationLayer`s (`BR_HYBRID` + optional `PDF_A3`, identified by
+  `EHybridValidationLayerKind`) instead of a flat finding list. Each layer carries its own findings
+  and wall-clock `Duration`. Aggregate predicates on `HybridValidationResult` continue to work
+  across all layers.
+* **Breaking**: `ValidationResult` renamed to `HybridValidationResult`, and the new
+  per-layer container is `HybridValidationLayer`.
+* **Breaking**: `EHybridSeverity.FATAL` renamed to `ERROR`. Predicate methods follow:
+  `isFatal()` → `isError()`, `hasFatal()` → `hasError()`, `hasFatalRule()` → `hasErrorRule()`.
+* `EHybridSeverity` entries now carry the equivalent ph-commons `EErrorLevel` via
+  `getErrorLevel()`, so consumers mapping findings into ph-commons error infrastructure no
+  longer need a translation table.
+* `EZugferdCountry` now implements `IHasID<String>` with `getID()` and the static
+  `getFromIDOrNull(String)` factory, matching the style of the other ph-commons-based enums.
+* CLI `validate` subcommand prints one line per layer with its kind, finding count, and
+  duration, then the layer's findings indented underneath.
 
 v0.9.0 - 2026-05-13
 * Detection: recognises all five XMP extension-schema namespaces seen across ZUGFeRD 1.0, 2.0.1, 2.1, 2.2, 2.3, 2.3.2, 2.3.3 and 2.4.

@@ -72,50 +72,50 @@ public final class HybridValidatorTest
   public void testRejectsNonHybridPdf () throws IOException
   {
     // A tiny hand-crafted PDF with no XMP / no embedded files must trigger BR-HYBRID-03.
-    final ValidationResult aRes = _newValidator (EZugferdCountry.OTHER).validate (HybridSource.fromBytes (_pdfWithoutInvoiceXml ()));
-    assertTrue ("Expected BR-HYBRID-03 fatal for non-hybrid PDF", aRes.hasFatalRule ("BR-HYBRID-03"));
+    final HybridValidationResult aRes = _newValidator (EZugferdCountry.OTHER).validate (HybridSource.fromBytes (_pdfWithoutInvoiceXml ()));
+    assertTrue ("Expected BR-HYBRID-03 fatal for non-hybrid PDF", aRes.hasErrorRule ("BR-HYBRID-03"));
   }
 
   @Test
   public void testValidLegacyInvoice_NoFatalFindings () throws IOException
   {
-    final ValidationResult aRes = _newValidator (EZugferdCountry.DE).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_0_1_EN16931));
-    assertFalse ("Unexpected fatal findings: " + aRes.getFindings (EHybridSeverity.FATAL), aRes.hasFatal ());
+    final HybridValidationResult aRes = _newValidator (EZugferdCountry.DE).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_0_1_EN16931));
+    assertFalse ("Unexpected fatal findings: " + aRes.getFindings (EHybridSeverity.ERROR), aRes.hasError ());
     assertTrue (aRes.isValid ());
   }
 
   @Test
   public void testMinimumProfile_DE_TriggersBrHybridDe01 () throws IOException
   {
-    final ValidationResult aRes = _newValidator (EZugferdCountry.DE).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_3_MINIMUM));
-    assertTrue ("BR-HYBRID-DE-01 must fire for MINIMUM in DE", aRes.hasFatalRule ("BR-HYBRID-DE-01"));
+    final HybridValidationResult aRes = _newValidator (EZugferdCountry.DE).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_3_MINIMUM));
+    assertTrue ("BR-HYBRID-DE-01 must fire for MINIMUM in DE", aRes.hasErrorRule ("BR-HYBRID-DE-01"));
   }
 
   @Test
   public void testMinimumProfile_FR_DoesNotTriggerBrHybridDe01 () throws IOException
   {
-    final ValidationResult aRes = _newValidator (EZugferdCountry.FR).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_3_MINIMUM));
+    final HybridValidationResult aRes = _newValidator (EZugferdCountry.FR).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_3_MINIMUM));
     assertFalse (aRes.hasRule ("BR-HYBRID-DE-01"));
   }
 
   @Test
   public void testBasicWlProfile_DE_TriggersBrHybridDe02 () throws IOException
   {
-    final ValidationResult aRes = _newValidator (EZugferdCountry.DE).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_4_BASIC_WL));
-    assertTrue ("BR-HYBRID-DE-02 must fire for BASIC WL in DE", aRes.hasFatalRule ("BR-HYBRID-DE-02"));
+    final HybridValidationResult aRes = _newValidator (EZugferdCountry.DE).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_4_BASIC_WL));
+    assertTrue ("BR-HYBRID-DE-02 must fire for BASIC WL in DE", aRes.hasErrorRule ("BR-HYBRID-DE-02"));
   }
 
   @Test
   public void testXRechnungProfile_FR_TriggersBrHybridFr01 () throws IOException
   {
-    final ValidationResult aRes = _newValidator (EZugferdCountry.FR).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_2_XRECHNUNG));
-    assertTrue ("BR-HYBRID-FR-01 must fire for XRECHNUNG in FR", aRes.hasFatalRule ("BR-HYBRID-FR-01"));
+    final HybridValidationResult aRes = _newValidator (EZugferdCountry.FR).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_2_XRECHNUNG));
+    assertTrue ("BR-HYBRID-FR-01 must fire for XRECHNUNG in FR", aRes.hasErrorRule ("BR-HYBRID-FR-01"));
   }
 
   @Test
   public void testXRechnungProfile_DE_DoesNotTriggerBrHybridFr01 () throws IOException
   {
-    final ValidationResult aRes = _newValidator (EZugferdCountry.DE).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_2_XRECHNUNG));
+    final HybridValidationResult aRes = _newValidator (EZugferdCountry.DE).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_2_XRECHNUNG));
     assertFalse (aRes.hasRule ("BR-HYBRID-FR-01"));
   }
 
@@ -124,7 +124,7 @@ public final class HybridValidatorTest
   {
     // The shipped 2.2 XRECHNUNG sample uses fx:Version="2.1" instead of "1.0", which should produce
     // BR-HYBRID-10 as a Warning (not Fatal).
-    final ValidationResult aRes = _newValidator (EZugferdCountry.OTHER).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_2_XRECHNUNG));
+    final HybridValidationResult aRes = _newValidator (EZugferdCountry.OTHER).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_2_XRECHNUNG));
     final HybridFinding aF = aRes.findByRuleID ("BR-HYBRID-10");
     assertNotNull ("BR-HYBRID-10 must be reported when fx:Version != 1.0", aF);
     assertTrue (aF.getSeverity () == EHybridSeverity.WARNING);
@@ -137,7 +137,7 @@ public final class HybridValidatorTest
     // exactly one INFORMATION finding (rather than fatal-failing).
     final HybridValidator v = new HybridValidator ();
     v.getSettings ().setCountry (EZugferdCountry.OTHER).setCheckPdfA3 (true);
-    final ValidationResult aRes = v.validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_0_1_EN16931));
+    final HybridValidationResult aRes = v.validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_0_1_EN16931));
     final HybridFinding aF = aRes.findByRuleID ("KALTBLUT-PDFA-SPI-MISSING");
     assertNotNull ("Without veraPDF on classpath the validator must record an SPI-missing INFO finding", aF);
     assertTrue (aF.getSeverity () == EHybridSeverity.INFORMATION);
