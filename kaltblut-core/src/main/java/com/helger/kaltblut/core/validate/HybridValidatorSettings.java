@@ -53,8 +53,7 @@ public final class HybridValidatorSettings
   @NonNull
   public HybridValidatorSettings setCountry (@NonNull final EZugferdCountry eCountry)
   {
-    if (eCountry == null)
-      throw new IllegalArgumentException ("country must not be null");
+    ValueEnforcer.notNull (eCountry, "Country");
     m_eCountry = eCountry;
     return this;
   }
