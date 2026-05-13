@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,9 +58,36 @@ public final class ExtractCommand implements Callable <Integer>
     m_aFiles = null;
   }
 
+  /**
+   * Reject any character that could be used to escape the output directory. The suffix is appended
+   * between the input PDF's base name and the literal ".xml" extension; allowing path separators,
+   * NUL, or ".." segments would let a caller write outside <code>--output-dir</code>.
+   */
+  private static boolean _isSuffixSafe (@NonNull final String sSuffix)
+  {
+    if (sSuffix.isEmpty ())
+      return true;
+    for (int i = 0; i < sSuffix.length (); i++)
+    {
+      final char c = sSuffix.charAt (i);
+      if (c == '/' || c == '\\' || c == '\0' || c == ':')
+        return false;
+    }
+    // Reject any ".." segment whether bare or embedded.
+    return !sSuffix.contains ("..");
+  }
+
   @Override
   public Integer call ()
   {
+    if (m_sSuffix == null || !_isSuffixSafe (m_sSuffix))
+    {
+      LOGGER.error ("Suffix '" +
+                    m_sSuffix +
+                    "' contains characters that are not permitted (path separators, '..', NUL, or ':').");
+      return Integer.valueOf (1);
+    }
+
     final File aOutDir = new File (m_sOutputDir).getAbsoluteFile ();
     if (!aOutDir.exists () && !aOutDir.mkdirs ())
     {

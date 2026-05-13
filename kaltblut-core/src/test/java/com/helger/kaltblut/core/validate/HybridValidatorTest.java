@@ -23,19 +23,49 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.Test;
 
 import com.helger.kaltblut.core.model.EZugferdCountry;
 import com.helger.kaltblut.core.source.HybridSource;
 import com.helger.kaltblut.testfiles.KaltblutTestFiles;
 
+/**
+ * Test class for class {@link HybridValidator}.
+ *
+ * @author Philip Helger
+ */
 public final class HybridValidatorTest
 {
-  private static HybridValidator _newValidator (final EZugferdCountry eCountry)
+  @NonNull
+  private static HybridValidator _newValidator (@NonNull final EZugferdCountry eCountry)
   {
     final HybridValidator v = new HybridValidator ();
     v.getSettings ().setCountry (eCountry).setCheckPdfA3 (false);
     return v;
+  }
+
+  /**
+   * Return the bytes of a minimal valid PDF (no XMP / no embedded files).
+   */
+  @NonNull
+  private static byte [] _pdfWithoutInvoiceXml ()
+  {
+    final String sPdf = "%PDF-1.4\n" +
+                        "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
+                        "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+                        "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<<>>>>endobj\n" +
+                        "xref\n" +
+                        "0 4\n" +
+                        "0000000000 65535 f \n" +
+                        "0000000009 00000 n \n" +
+                        "0000000052 00000 n \n" +
+                        "0000000101 00000 n \n" +
+                        "trailer<</Size 4/Root 1 0 R>>\n" +
+                        "startxref\n" +
+                        "173\n" +
+                        "%%EOF\n";
+    return sPdf.getBytes (StandardCharsets.US_ASCII);
   }
 
   @Test
@@ -111,27 +141,5 @@ public final class HybridValidatorTest
     final HybridFinding aF = aRes.findByRuleID ("KALTBLUT-PDFA-SPI-MISSING");
     assertNotNull ("Without veraPDF on classpath the validator must record an SPI-missing INFO finding", aF);
     assertTrue (aF.getSeverity () == EHybridSeverity.INFORMATION);
-  }
-
-  /**
-   * Return the bytes of a minimal valid PDF (no XMP / no embedded files).
-   */
-  private static byte [] _pdfWithoutInvoiceXml ()
-  {
-    final String sPdf = "%PDF-1.4\n" +
-                        "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
-                        "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
-                        "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<<>>>>endobj\n" +
-                        "xref\n" +
-                        "0 4\n" +
-                        "0000000000 65535 f \n" +
-                        "0000000009 00000 n \n" +
-                        "0000000052 00000 n \n" +
-                        "0000000101 00000 n \n" +
-                        "trailer<</Size 4/Root 1 0 R>>\n" +
-                        "startxref\n" +
-                        "173\n" +
-                        "%%EOF\n";
-    return sPdf.getBytes (StandardCharsets.US_ASCII);
   }
 }

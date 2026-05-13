@@ -19,16 +19,23 @@ package com.helger.kaltblut.core.source;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 
 import org.junit.Test;
 
+/**
+ * Test class for class {@link HybridSource}.
+ *
+ * @author Philip Helger
+ */
 public final class HybridSourceTest
 {
   @Test
@@ -116,5 +123,36 @@ public final class HybridSourceTest
   public void testFromClasspathMissingThrows () throws IOException
   {
     HybridSource.fromClasspath ("external/does-not-exist.pdf");
+  }
+
+  @Test
+  public void testFromUrlRejectsFileScheme () throws Exception
+  {
+    assertThrows (IllegalArgumentException.class, () -> HybridSource.fromUrl (new URI ("file:///etc/passwd").toURL ()));
+  }
+
+  @Test
+  public void testFromUrlRejectsJarScheme () throws Exception
+  {
+    assertThrows (IllegalArgumentException.class,
+                  () -> HybridSource.fromUrl (new URI ("jar:file:/tmp/foo.jar!/x").toURL ()));
+  }
+
+  @Test
+  public void testFromUrlAcceptsHttp () throws Exception
+  {
+    // Constructing the source must succeed; we don't read from it.
+    HybridSource.fromUrl (new URI ("http://example.invalid/foo.pdf").toURL ());
+    HybridSource.fromUrl (new URI ("https://example.invalid/foo.pdf").toURL ());
+  }
+
+  @Test
+  public void testGetBytesWithLimit () throws IOException
+  {
+    final byte [] aData = new byte [1024];
+    final IHybridSource aSource = HybridSource.fromBytes (aData);
+    assertArrayEquals (aData, aSource.getBytes (-1L));
+    assertArrayEquals (aData, aSource.getBytes (1024L));
+    assertThrows (IOException.class, () -> aSource.getBytes (1023L));
   }
 }

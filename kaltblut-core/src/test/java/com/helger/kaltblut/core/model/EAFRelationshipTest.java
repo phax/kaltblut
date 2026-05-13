@@ -21,6 +21,11 @@ import static org.junit.Assert.assertNull;
 
 import org.junit.Test;
 
+/**
+ * Test class for class {@link EAFRelationship}.
+ *
+ * @author Philip Helger
+ */
 public final class EAFRelationshipTest
 {
   @Test

@@ -42,7 +42,7 @@ import com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI;
 
 /**
  * veraPDF-backed implementation of {@link IPdfA3ValidatorSPI}. Registered via
- * <code>META-INF/services/com.helger.kaltblut.validate.IPdfA3Validator</code>.
+ * <code>META-INF/services/com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI</code>.
  * <p>
  * The validator auto-detects the PDF/A flavor from the document itself and only proceeds if it is
  * PDF/A-3 (3a / 3b / 3u) or PDF/A-4f. Other flavors produce a single {@code FATAL} finding.

@@ -47,6 +47,35 @@ public interface IHybridSource
   byte [] getBytes () throws IOException;
 
   /**
+   * Return the complete PDF bytes, refusing to read more than the given limit.
+   * <p>
+   * Default implementation: short-circuits via {@link #getSize()} when the size is known up front,
+   * otherwise reads through {@link #getBytes()} and checks the length afterwards. Implementations
+   * over a streaming source (URL, network) should override this method to enforce the limit
+   * <em>during</em> the read, so that an oversized response is not first fully buffered.
+   *
+   * @param nMaxBytes
+   *        maximum number of bytes to read. {@code -1} disables the limit and is equivalent to
+   *        {@link #getBytes()}.
+   * @return the bytes. Never <code>null</code>.
+   * @throws IOException
+   *         on I/O failure, or if the source exceeds <code>nMaxBytes</code>.
+   */
+  @NonNull
+  default byte [] getBytes (final long nMaxBytes) throws IOException
+  {
+    if (nMaxBytes < 0)
+      return getBytes ();
+    final long nSize = getSize ();
+    if (nSize >= 0 && nSize > nMaxBytes)
+      throw new IOException ("Source size " + nSize + " exceeds limit of " + nMaxBytes + " bytes");
+    final byte [] aBytes = getBytes ();
+    if (aBytes.length > nMaxBytes)
+      throw new IOException ("Source size " + aBytes.length + " exceeds limit of " + nMaxBytes + " bytes");
+    return aBytes;
+  }
+
+  /**
    * @return the size of the source in bytes if known, or <code>-1</code> if not known up front.
    *         Hint only; once {@link #getBytes()} has been called the canonical size is
    *         <code>getBytes().length</code>.

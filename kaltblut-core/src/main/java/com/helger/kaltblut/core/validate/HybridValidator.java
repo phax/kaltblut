@@ -86,7 +86,7 @@ public final class HybridValidator
     ICommonsList <HybridAttachment> aAttachments = new CommonsArrayList <> ();
     boolean bXmlExtractable = false;
 
-    try (final HybridDocument aDoc = HybridDocument.open (aSource))
+    try (final HybridDocument aDoc = HybridDocument.open (aSource, m_aSettings.getLimits ()))
     {
       aMeta = aDoc.readMetadata ();
       aAttachments = aDoc.listAttachments ();

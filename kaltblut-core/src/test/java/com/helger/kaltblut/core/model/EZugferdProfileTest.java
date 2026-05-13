@@ -21,6 +21,11 @@ import static org.junit.Assert.assertNull;
 
 import org.junit.Test;
 
+/**
+ * Test class for class {@link EZugferdProfile}.
+ *
+ * @author Philip Helger
+ */
 public final class EZugferdProfileTest
 {
   @Test

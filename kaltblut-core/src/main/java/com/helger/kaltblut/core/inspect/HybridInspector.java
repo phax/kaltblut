@@ -27,6 +27,7 @@ import com.helger.kaltblut.core.model.EZugferdFlavor;
 import com.helger.kaltblut.core.model.EZugferdProfile;
 import com.helger.kaltblut.core.model.HybridMetadata;
 import com.helger.kaltblut.core.pdfbox.HybridDocument;
+import com.helger.kaltblut.core.source.HybridLimits;
 import com.helger.kaltblut.core.source.IHybridSource;
 
 /**
@@ -53,15 +54,27 @@ public final class HybridInspector
    */
   public static boolean isHybridInvoice (@NonNull final IHybridSource aSource) throws IOException
   {
+    return isHybridInvoice (aSource, HybridLimits.DEFAULTS);
+  }
+
+  /**
+   * Quick check whether the given PDF carries a recognised hybrid-invoice XMP signature, enforcing
+   * the given byte ceilings.
+   *
+   * @param aSource
+   *        the source. May not be <code>null</code>.
+   * @param aLimits
+   *        the limits. May not be <code>null</code>.
+   * @return <code>true</code> if recognised, <code>false</code> otherwise.
+   * @throws IOException
+   *         on I/O failure or limit violation.
+   */
+  public static boolean isHybridInvoice (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
+                                                                                                                    throws IOException
+  {
     ValueEnforcer.notNull (aSource, "Source");
-    try
-    {
-      return readMetadata (aSource).isRecognisedHybridInvoice ();
-    }
-    catch (final IOException ex)
-    {
-      throw ex;
-    }
+    ValueEnforcer.notNull (aLimits, "Limits");
+    return readMetadata (aSource, aLimits).isRecognisedHybridInvoice ();
   }
 
   /**
@@ -80,6 +93,25 @@ public final class HybridInspector
   }
 
   /**
+   * Identify the spec generation (namespace URI) of a hybrid invoice, enforcing the given byte
+   * ceilings.
+   *
+   * @param aSource
+   *        the source. May not be <code>null</code>.
+   * @param aLimits
+   *        the limits. May not be <code>null</code>.
+   * @return the detected flavor, or <code>null</code> if no recognised XMP signature is found.
+   * @throws IOException
+   *         on I/O failure or limit violation.
+   */
+  @Nullable
+  public static EZugferdFlavor detectFlavor (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
+                                                                                                                        throws IOException
+  {
+    return readMetadata (aSource, aLimits).getFlavor ();
+  }
+
+  /**
    * Read the resolved profile.
    *
    * @param aSource
@@ -95,6 +127,24 @@ public final class HybridInspector
   }
 
   /**
+   * Read the resolved profile, enforcing the given byte ceilings.
+   *
+   * @param aSource
+   *        the source. May not be <code>null</code>.
+   * @param aLimits
+   *        the limits. May not be <code>null</code>.
+   * @return the resolved profile, or <code>null</code>.
+   * @throws IOException
+   *         on I/O failure or limit violation.
+   */
+  @Nullable
+  public static EZugferdProfile detectProfile (@NonNull final IHybridSource aSource,
+                                               @NonNull final HybridLimits aLimits) throws IOException
+  {
+    return readMetadata (aSource, aLimits).getProfile ();
+  }
+
+  /**
    * Read all hybrid-invoice metadata in a single pass.
    *
    * @param aSource
@@ -106,7 +156,26 @@ public final class HybridInspector
   @NonNull
   public static HybridMetadata readMetadata (@NonNull final IHybridSource aSource) throws IOException
   {
+    return readMetadata (aSource, HybridLimits.DEFAULTS);
+  }
+
+  /**
+   * Read all hybrid-invoice metadata in a single pass, enforcing the given byte ceilings.
+   *
+   * @param aSource
+   *        the source. May not be <code>null</code>.
+   * @param aLimits
+   *        the limits. May not be <code>null</code>.
+   * @return the metadata snapshot.
+   * @throws IOException
+   *         on I/O / PDF / XMP parsing failure or limit violation.
+   */
+  @NonNull
+  public static HybridMetadata readMetadata (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
+                                                                                                                        throws IOException
+  {
     ValueEnforcer.notNull (aSource, "Source");
-    return HybridDocument.withOpenDocument (aSource, HybridDocument::readMetadata);
+    ValueEnforcer.notNull (aLimits, "Limits");
+    return HybridDocument.withOpenDocument (aSource, aLimits, HybridDocument::readMetadata);
   }
 }

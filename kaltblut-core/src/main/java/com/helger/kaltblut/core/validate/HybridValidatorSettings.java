@@ -20,8 +20,10 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.concurrent.NotThreadSafe;
+import com.helger.base.enforce.ValueEnforcer;
 import com.helger.kaltblut.core.model.EZugferdCountry;
 import com.helger.kaltblut.core.model.EZugferdFlavor;
+import com.helger.kaltblut.core.source.HybridLimits;
 
 /**
  * Mutable settings for {@link HybridValidator}. All settings default to values appropriate for a
@@ -36,6 +38,7 @@ public final class HybridValidatorSettings
   private EZugferdFlavor m_eExpectedFlavor;
   private boolean m_bCheckPdfA3 = true;
   private boolean m_bApplyDePdfADowngrade = true;
+  private HybridLimits m_aLimits = HybridLimits.DEFAULTS;
 
   /**
    * @return the country context. Drives BR-HYBRID-DE-*, BR-HYBRID-FR-*, BR-FX-DE-*. Default is
@@ -72,7 +75,10 @@ public final class HybridValidatorSettings
     return this;
   }
 
-  /** @return whether to run PDF/A-3 validation via the {@link IPdfA3ValidatorSPI} SPI. Default <code>true</code>. */
+  /**
+   * @return whether to run PDF/A-3 validation via the {@link IPdfA3ValidatorSPI} SPI. Default
+   *         <code>true</code>.
+   */
   public boolean isCheckPdfA3 ()
   {
     return m_bCheckPdfA3;
@@ -87,8 +93,8 @@ public final class HybridValidatorSettings
 
   /**
    * @return whether to apply the <code>BR-FX-DE-03</code> downgrade (PDF/A-3 fatal errors become
-   *         warnings when {@link #getCountry()} is {@link EZugferdCountry#DE} and the XML is valid /
-   *         extractable). Default <code>true</code>.
+   *         warnings when {@link #getCountry()} is {@link EZugferdCountry#DE} and the XML is valid
+   *         / extractable). Default <code>true</code>.
    */
   public boolean isApplyDePdfADowngrade ()
   {
@@ -99,6 +105,24 @@ public final class HybridValidatorSettings
   public HybridValidatorSettings setApplyDePdfADowngrade (final boolean bApplyDePdfADowngrade)
   {
     m_bApplyDePdfADowngrade = bApplyDePdfADowngrade;
+    return this;
+  }
+
+  /**
+   * @return the byte / count ceilings applied while reading the PDF and its attachments. Default is
+   *         {@link HybridLimits#DEFAULTS}.
+   */
+  @NonNull
+  public HybridLimits getLimits ()
+  {
+    return m_aLimits;
+  }
+
+  @NonNull
+  public HybridValidatorSettings setLimits (@NonNull final HybridLimits aLimits)
+  {
+    ValueEnforcer.notNull (aLimits, "Limits");
+    m_aLimits = aLimits;
     return this;
   }
 }

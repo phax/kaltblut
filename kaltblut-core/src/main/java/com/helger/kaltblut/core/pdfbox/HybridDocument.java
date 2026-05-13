@@ -51,6 +51,7 @@ import org.w3c.dom.NodeList;
 import com.helger.annotation.WillClose;
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.io.nonblocking.NonBlockingByteArrayOutputStream;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.CommonsHashMap;
@@ -61,6 +62,7 @@ import com.helger.kaltblut.core.model.EZugferdFlavor;
 import com.helger.kaltblut.core.model.EZugferdProfile;
 import com.helger.kaltblut.core.model.HybridAttachment;
 import com.helger.kaltblut.core.model.HybridMetadata;
+import com.helger.kaltblut.core.source.HybridLimits;
 import com.helger.kaltblut.core.source.IHybridSource;
 import com.helger.xml.serialize.read.DOMReader;
 
@@ -90,30 +92,54 @@ public final class HybridDocument implements AutoCloseable
 
   private final PDDocument m_aDoc;
   private final IHybridSource m_aSource;
+  private final HybridLimits m_aLimits;
   private HybridMetadata m_aCachedMetadata;
   private ICommonsList <HybridAttachment> m_aCachedAttachments;
 
-  private HybridDocument (@NonNull final PDDocument aDoc, @NonNull final IHybridSource aSource)
+  private HybridDocument (@NonNull final PDDocument aDoc,
+                          @NonNull final IHybridSource aSource,
+                          @NonNull final HybridLimits aLimits)
   {
     m_aDoc = aDoc;
     m_aSource = aSource;
+    m_aLimits = aLimits;
   }
 
   /**
-   * Open a hybrid-invoice PDF.
+   * Open a hybrid-invoice PDF using {@link HybridLimits#DEFAULTS}.
    *
    * @param aSource
    *        the source. May not be <code>null</code>.
    * @return an opened document; close it via {@link #close()}.
    * @throws IOException
-   *         on I/O or PDF-parsing failure.
+   *         on I/O or PDF-parsing failure, or if the source exceeds the default size limit.
    */
   @NonNull
   public static HybridDocument open (@NonNull final IHybridSource aSource) throws IOException
   {
+    return open (aSource, HybridLimits.DEFAULTS);
+  }
+
+  /**
+   * Open a hybrid-invoice PDF, enforcing the given byte / count ceilings.
+   *
+   * @param aSource
+   *        the source. May not be <code>null</code>.
+   * @param aLimits
+   *        the limits. May not be <code>null</code>; use {@link HybridLimits#UNLIMITED} to disable.
+   * @return an opened document; close it via {@link #close()}.
+   * @throws IOException
+   *         on I/O or PDF-parsing failure, or if the source exceeds <code>aLimits.getMaxPdfBytes()</code>.
+   */
+  @NonNull
+  public static HybridDocument open (@NonNull final IHybridSource aSource,
+                                     @NonNull final HybridLimits aLimits) throws IOException
+  {
     ValueEnforcer.notNull (aSource, "Source");
-    final PDDocument aDoc = Loader.loadPDF (aSource.getBytes ());
-    return new HybridDocument (aDoc, aSource);
+    ValueEnforcer.notNull (aLimits, "Limits");
+    final byte [] aBytes = aSource.getBytes (aLimits.getMaxPdfBytes ());
+    final PDDocument aDoc = Loader.loadPDF (aBytes);
+    return new HybridDocument (aDoc, aSource, aLimits);
   }
 
   /**
@@ -132,6 +158,13 @@ public final class HybridDocument implements AutoCloseable
   public IHybridSource getSource ()
   {
     return m_aSource;
+  }
+
+  /** @return the limits in effect for this document. Never <code>null</code>. */
+  @NonNull
+  public HybridLimits getLimits ()
+  {
+    return m_aLimits;
   }
 
   /**
@@ -322,6 +355,37 @@ public final class HybridDocument implements AutoCloseable
     return aEF;
   }
 
+  /**
+   * Read at most <code>nMaxBytes</code> bytes from the given input stream into a byte array. A
+   * value of {@code -1} for <code>nMaxBytes</code> disables the limit (equivalent to
+   * {@link StreamHelper#getAllBytes(InputStream)}). The stream is consumed but not closed.
+   */
+  @NonNull
+  private static byte [] _readBounded (@NonNull final InputStream aIS,
+                                       final long nMaxBytes,
+                                       @NonNull final String sWhat) throws IOException
+  {
+    if (nMaxBytes < 0)
+    {
+      final byte [] aAll = StreamHelper.getAllBytes (aIS);
+      return aAll != null ? aAll : new byte [0];
+    }
+    try (final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
+    {
+      final byte [] aBuf = new byte [8192];
+      long nTotal = 0L;
+      int nRead;
+      while ((nRead = aIS.read (aBuf)) > 0)
+      {
+        nTotal += nRead;
+        if (nTotal > nMaxBytes)
+          throw new IOException (sWhat + " exceeded limit of " + nMaxBytes + " bytes");
+        aBAOS.write (aBuf, 0, nRead);
+      }
+      return aBAOS.toByteArray ();
+    }
+  }
+
   @NonNull
   private ICommonsList <HybridAttachment> _doListAttachments () throws IOException
   {
@@ -337,6 +401,18 @@ public final class HybridDocument implements AutoCloseable
       if (aEFTree != null)
       {
         final ICommonsMap <String, PDComplexFileSpecification> aAll = _collectAllEmbeddedFiles (aEFTree);
+
+        final int nMaxCount = m_aLimits.getMaxAttachmentCount ();
+        if (nMaxCount >= 0 && aAll.size () > nMaxCount)
+          throw new IOException ("Embedded file count " +
+                                 aAll.size () +
+                                 " exceeds limit of " +
+                                 nMaxCount);
+
+        final long nMaxPer = m_aLimits.getMaxAttachmentBytes ();
+        final long nMaxAggregate = m_aLimits.getMaxAggregateAttachmentBytes ();
+        long nAggregate = 0L;
+
         for (final var aEntry : aAll.entrySet ())
         {
           final String sName = aEntry.getKey ();
@@ -351,12 +427,18 @@ public final class HybridDocument implements AutoCloseable
           final byte [] aBytes;
           try (final InputStream aIS = aEF.createInputStream ())
           {
-            aBytes = StreamHelper.getAllBytes (aIS);
+            aBytes = _readBounded (aIS, nMaxPer, "Embedded file '" + sName + "'");
           }
-          if (aBytes == null)
+
+          if (nMaxAggregate >= 0)
           {
-            LOGGER.warn ("Embedded file '" + sName + "' has no bytes");
-            continue;
+            nAggregate += aBytes.length;
+            if (nAggregate > nMaxAggregate)
+              throw new IOException ("Aggregate embedded-file size exceeded limit of " +
+                                     nMaxAggregate +
+                                     " bytes at attachment '" +
+                                     sName +
+                                     "'");
           }
 
           final String sMime = aEF.getSubtype ();
@@ -467,7 +549,8 @@ public final class HybridDocument implements AutoCloseable
   }
 
   /**
-   * Open, run a function, close. Convenience for one-shot operations.
+   * Open with {@link HybridLimits#DEFAULTS}, run a function, close. Convenience for one-shot
+   * operations.
    *
    * @param aSource
    *        Source
@@ -482,7 +565,29 @@ public final class HybridDocument implements AutoCloseable
   public static <T> T withOpenDocument (@NonNull final IHybridSource aSource,
                                         @NonNull final IHybridDocumentFunction <T> aFn) throws IOException
   {
-    try (final HybridDocument aDoc = open (aSource))
+    return withOpenDocument (aSource, HybridLimits.DEFAULTS, aFn);
+  }
+
+  /**
+   * Open with the given limits, run a function, close.
+   *
+   * @param aSource
+   *        Source
+   * @param aLimits
+   *        Limits
+   * @param aFn
+   *        Function to run
+   * @return The function response
+   * @param <T>
+   *        Response document type
+   * @throws IOException
+   *         if something goes wrong
+   */
+  public static <T> T withOpenDocument (@NonNull final IHybridSource aSource,
+                                        @NonNull final HybridLimits aLimits,
+                                        @NonNull final IHybridDocumentFunction <T> aFn) throws IOException
+  {
+    try (final HybridDocument aDoc = open (aSource, aLimits))
     {
       return aFn.apply (aDoc);
     }

@@ -31,6 +31,11 @@ import com.helger.kaltblut.core.model.HybridAttachment;
 import com.helger.kaltblut.core.source.HybridSource;
 import com.helger.kaltblut.testfiles.KaltblutTestFiles;
 
+/**
+ * Test class for class {@link HybridExtractor}.
+ *
+ * @author Philip Helger
+ */
 public final class HybridExtractorTest
 {
   @Test
@@ -39,7 +44,8 @@ public final class HybridExtractorTest
     final byte [] aXml = HybridExtractor.extractInvoiceXml (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_0_1_EN16931));
     assertNotNull (aXml);
     assertTrue ("Expected non-empty XML", aXml.length > 0);
-    // PDFBox returns the embedded bytes verbatim; XMLs from FeRD start with a UTF-8 XML declaration.
+    // PDFBox returns the embedded bytes verbatim; XMLs from FeRD start with a UTF-8 XML
+    // declaration.
     final String sHead = new String (aXml, 0, Math.min (aXml.length, 32), StandardCharsets.UTF_8);
     assertTrue ("Embedded XML must start with an XML declaration: " + sHead, sHead.startsWith ("<?xml"));
   }

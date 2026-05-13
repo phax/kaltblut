@@ -72,7 +72,7 @@ IHybridSource s1 = HybridSource.fromFile (new File ("invoice.pdf"));         // 
 IHybridSource s2 = HybridSource.fromPath (Path.of ("invoice.pdf"));          // lazy + cached
 IHybridSource s3 = HybridSource.fromBytes (aPdfBytes);                       // wraps array
 IHybridSource s4 = HybridSource.fromByteBuffer (aBuffer);                    // copies
-IHybridSource s5 = HybridSource.fromUrl (new URL ("https://example.com/invoice.pdf"));
+IHybridSource s5 = HybridSource.fromUrl (new URL ("https://example.com/invoice.pdf"));      // http/https only, with timeouts
 IHybridSource s6 = HybridSource.fromInputStream (aIS);                       // reads now, closes
 IHybridSource s7 = HybridSource.fromClasspath ("samples/invoice.pdf");       // resource path
 ```
@@ -82,6 +82,24 @@ plus `long getSize()` and `String getName()` as diagnostic hints. PDFBox 3 needs
 and every Kaltblut operation eventually needs the complete PDF in memory, so distinguishing
 single-read from multi-read inputs added API surface without value. Implementations may read
 lazily on first call and cache the result; callers must not mutate the returned array.
+
+`HybridSource.fromUrl` only accepts `http` and `https` URLs and applies sensible connect / read
+timeouts (defaults 10 s / 60 s); other schemes (`file:`, `jar:`, `ftp:`, ...) are refused to
+prevent accidental SSRF / local-file-read when forwarding caller-supplied URLs.
+
+### `HybridLimits` — byte / count ceilings
+
+Every Tier-1/2/3 entry point accepts an optional `HybridLimits` (defaulting to
+`HybridLimits.DEFAULTS`) that caps:
+
+- the input PDF size (default 64 MiB),
+- per-attachment inflated size (default 32 MiB),
+- aggregate attachment size (default 128 MiB),
+- attachment count (default 100).
+
+Use `HybridLimits.UNLIMITED` to disable, or build a custom instance with the immutable
+`withMaxPdfBytes(...)` / `withMaxAttachmentBytes(...)` / ... witherers. Reading past a limit
+throws `IOException` rather than letting the JVM OOM.
 
 ### Model
 
@@ -126,6 +144,12 @@ byte [] aXmlBytes = HybridExtractor.extractInvoiceXml (aSource);
 List <HybridAttachment> aAttachments = HybridExtractor.listAttachments (aSource);
 byte [] aExcel = HybridExtractor.extractAttachment (aSource, "list_of_measurement.xlsx");
 ```
+
+**Security note:** the bytes returned by `extractInvoiceXml` / `extractAttachment` come from a
+potentially untrusted PDF. If you parse the XML yourself, configure your XML processor to disable
+external entities, DTDs, and XInclude (i.e. `FEATURE_SECURE_PROCESSING=true` plus
+`disallow-doctype-decl=true`), or use a library — such as `phive-rules-zugferd` — that does so
+by default. Otherwise a malicious invoice can XXE-read local files or trigger SSRF.
 
 ### Tier 3: validation
 
