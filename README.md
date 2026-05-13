@@ -1,4 +1,4 @@
-# FlugEsel
+# Kaltblut
 
 A Java toolkit for working with **ZUGFeRD / Factur-X** hybrid invoices: detect the flavor of any
 hybrid PDF, extract the embedded XML and supporting attachments, and validate the carrier-side
@@ -29,18 +29,11 @@ The detection table covers every published release since 2014:
 | 2.3.3   | 1.07.3   | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 | 2.4     | 1.08     | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 
-## Why "FlugEsel"?
+## Why "Kaltblut"?
 
-This project's name is a playful nod to ZUGFeRD, the German e-invoicing format it works with.
+<!-- TODO: write the "Why Kaltblut" section -->
 
-In German, ZUGFeRD sounds like "Zugpferd" — literally a draft horse, the workhorse that pulls a carriage.
-  Fitting, since the standard is meant to be a reliable workhorse of electronic invoicing in Germany.
-
-FlugEsel continues the joke: Flug (flight) + Esel (donkey) = "flying donkey."
-Where ZUGFeRD is a sturdy draft horse plodding along the ground, FlugEsel is its lighter, more whimsical cousin — a donkey that somehow takes to the air.
-The name signals that this project handles ZUGFeRD documents, but with a lighter, faster, more unconventional approach.
-
-## What FlugEsel Does (and Does Not Do)
+## What Kaltblut Does (and Does Not Do)
 
 | Tier | Concern                                                                                     | Status      |
 | ---- | ------------------------------------------------------------------------------------------- | ----------- |
@@ -54,12 +47,12 @@ The name signals that this project handles ZUGFeRD documents, but with a lighter
 
 This is a multi-module Maven project:
 
-- `flugesel-core` — the library. Source abstraction, model, inspector, extractor, validator.
-  Classes live under `com.helger.flugesel.core.*`.
-- `flugesel-testfiles` — shared test fixtures (sample PDFs + classpath-resource locator).
-- `flugesel-verapdf` — PDF/A-3 validation adapter that wires veraPDF to the
+- `kaltblut-core` — the library. Source abstraction, model, inspector, extractor, validator.
+  Classes live under `com.helger.kaltblut.core.*`.
+- `kaltblut-testfiles` — shared test fixtures (sample PDFs + classpath-resource locator).
+- `kaltblut-verapdf` — PDF/A-3 validation adapter that wires veraPDF to the
   `IPdfA3ValidatorSPI` SPI. Optional; pull it in only if you need PDF/A-3 conformance checks.
-- `flugesel-cli` — the command-line client (picocli). Builds a standalone fat JAR.
+- `kaltblut-cli` — the command-line client (picocli). Builds a standalone fat JAR.
 
 ## Key Library Concepts
 
@@ -68,8 +61,8 @@ This is a multi-module Maven project:
 All public entry points take a source. Use one of the `HybridSource` factories:
 
 ```java
-import com.helger.flugesel.core.source.HybridSource;
-import com.helger.flugesel.core.source.IHybridSource;
+import com.helger.kaltblut.core.source.HybridSource;
+import com.helger.kaltblut.core.source.IHybridSource;
 
 IHybridSource s1 = HybridSource.fromFile (new File ("invoice.pdf"));         // lazy + cached
 IHybridSource s2 = HybridSource.fromPath (Path.of ("invoice.pdf"));          // lazy + cached
@@ -82,13 +75,13 @@ IHybridSource s7 = HybridSource.fromClasspath ("samples/invoice.pdf");       // 
 
 `IHybridSource` is byte-array-centric: the contract is `byte[] getBytes() throws IOException`,
 plus `long getSize()` and `String getName()` as diagnostic hints. PDFBox 3 needs random access
-and every FlugEsel operation eventually needs the complete PDF in memory, so distinguishing
+and every Kaltblut operation eventually needs the complete PDF in memory, so distinguishing
 single-read from multi-read inputs added API surface without value. Implementations may read
 lazily on first call and cache the result; callers must not mutate the returned array.
 
 ### Model
 
-The model classes in `com.helger.flugesel.core.model` are immutable value objects:
+The model classes in `com.helger.kaltblut.core.model` are immutable value objects:
 
 - `EZugferdFlavor` — namespace-URI fingerprint of the spec generation.
 - `EZugferdProfile` — `MINIMUM`, `BASIC_WL`, `BASIC`, `COMFORT`, `EN_16931`, `EXTENDED`, `XRECHNUNG`.
@@ -102,9 +95,9 @@ The model classes in `com.helger.flugesel.core.model` are immutable value object
 ### Tier 1: detection
 
 ```java
-import com.helger.flugesel.core.inspect.HybridInspector;
-import com.helger.flugesel.core.model.EZugferdFlavor;
-import com.helger.flugesel.core.model.HybridMetadata;
+import com.helger.kaltblut.core.inspect.HybridInspector;
+import com.helger.kaltblut.core.model.EZugferdFlavor;
+import com.helger.kaltblut.core.model.HybridMetadata;
 
 IHybridSource aSource = HybridSource.fromFile (new File ("invoice.pdf"));
 
@@ -122,8 +115,8 @@ if (HybridInspector.isHybridInvoice (aSource))
 ### Tier 2: extraction
 
 ```java
-import com.helger.flugesel.core.extract.HybridExtractor;
-import com.helger.flugesel.core.model.HybridAttachment;
+import com.helger.kaltblut.core.extract.HybridExtractor;
+import com.helger.kaltblut.core.model.HybridAttachment;
 
 byte [] aXmlBytes = HybridExtractor.extractInvoiceXml (aSource);
 List <HybridAttachment> aAttachments = HybridExtractor.listAttachments (aSource);
@@ -133,10 +126,10 @@ byte [] aExcel = HybridExtractor.extractAttachment (aSource, "list_of_measuremen
 ### Tier 3: validation
 
 ```java
-import com.helger.flugesel.core.model.EZugferdCountry;
-import com.helger.flugesel.core.validate.HybridFinding;
-import com.helger.flugesel.core.validate.HybridValidator;
-import com.helger.flugesel.core.validate.ValidationResult;
+import com.helger.kaltblut.core.model.EZugferdCountry;
+import com.helger.kaltblut.core.validate.HybridFinding;
+import com.helger.kaltblut.core.validate.HybridValidator;
+import com.helger.kaltblut.core.validate.ValidationResult;
 
 HybridValidator aValidator = new HybridValidator ();
 aValidator.getSettings ()
@@ -146,11 +139,11 @@ aValidator.getSettings ()
 
 ValidationResult aResult = aValidator.validate (aSource);
 if (!aResult.isValid ())
-  for (HybridFinding aF : aResult.getFindings (com.helger.flugesel.core.validate.EHybridSeverity.FATAL))
+  for (HybridFinding aF : aResult.getFindings (com.helger.kaltblut.core.validate.EHybridSeverity.FATAL))
     System.out.println (aF);
 ```
 
-PDF/A-3 validation runs via the `IPdfA3ValidatorSPI` SPI. Add `flugesel-verapdf` to the classpath
+PDF/A-3 validation runs via the `IPdfA3ValidatorSPI` SPI. Add `kaltblut-verapdf` to the classpath
 to enable veraPDF; without it `validate()` records a single `INFORMATION` finding noting that
 PDF/A-3 conformance was not checked.
 
@@ -160,7 +153,7 @@ Build the standalone fat JAR and run it:
 
 ```bash
 mvn clean package
-java -jar flugesel-cli/target/flugesel-cli-full.jar [subcommand] [options] <files...>
+java -jar kaltblut-cli/target/kaltblut-cli-full.jar [subcommand] [options] <files...>
 ```
 
 Subcommands:
@@ -188,19 +181,19 @@ Examples:
 
 ```bash
 # Detect the flavor of one or more PDFs
-java -jar flugesel-cli-full.jar inspect invoice.pdf another-invoice.pdf
+java -jar kaltblut-cli-full.jar inspect invoice.pdf another-invoice.pdf
 
 # Extract the invoice XML to /tmp/out/
-java -jar flugesel-cli-full.jar extract -o /tmp/out invoice.pdf
+java -jar kaltblut-cli-full.jar extract -o /tmp/out invoice.pdf
 
 # List all embedded files in a PDF
-java -jar flugesel-cli-full.jar attachments invoice.pdf
+java -jar kaltblut-cli-full.jar attachments invoice.pdf
 
 # Validate a DE↔DE invoice (PDF/A-3 errors downgraded per BR-FX-DE-03)
-java -jar flugesel-cli-full.jar validate -c DE invoice.pdf
+java -jar kaltblut-cli-full.jar validate -c DE invoice.pdf
 
 # Validate without PDF/A-3 (fast path; only the BR-HYBRID-* rules run)
-java -jar flugesel-cli-full.jar validate --no-pdfa invoice.pdf
+java -jar kaltblut-cli-full.jar validate --no-pdfa invoice.pdf
 ```
 
 ## Building
@@ -213,25 +206,25 @@ mvn clean package
 
 The build produces (replacing `x.y.z` with the effective version):
 
-- `flugesel-core/target/flugesel-core-x.y.z-SNAPSHOT.jar` — core library JAR.
-- `flugesel-verapdf/target/flugesel-verapdf-x.y.z-SNAPSHOT.jar` — veraPDF adapter JAR.
-- `flugesel-cli/target/flugesel-cli-x.y.z-SNAPSHOT.jar` — CLI library JAR.
-- `flugesel-cli/target/flugesel-cli-full.jar` — standalone executable fat JAR (all dependencies bundled).
+- `kaltblut-core/target/kaltblut-core-x.y.z-SNAPSHOT.jar` — core library JAR.
+- `kaltblut-verapdf/target/kaltblut-verapdf-x.y.z-SNAPSHOT.jar` — veraPDF adapter JAR.
+- `kaltblut-cli/target/kaltblut-cli-x.y.z-SNAPSHOT.jar` — CLI library JAR.
+- `kaltblut-cli/target/kaltblut-cli-full.jar` — standalone executable fat JAR (all dependencies bundled).
 
 ## Maven Coordinates
 
 ```xml
 <!-- Core library: detection + extraction + BR-HYBRID validation -->
 <dependency>
-  <groupId>com.helger.flugesel</groupId>
-  <artifactId>flugesel-core</artifactId>
+  <groupId>com.helger.kaltblut</groupId>
+  <artifactId>kaltblut-core</artifactId>
   <version>x.y.z</version>
 </dependency>
 
 <!-- Optional: veraPDF-backed PDF/A-3 validation -->
 <dependency>
-  <groupId>com.helger.flugesel</groupId>
-  <artifactId>flugesel-verapdf</artifactId>
+  <groupId>com.helger.kaltblut</groupId>
+  <artifactId>kaltblut-verapdf</artifactId>
   <version>x.y.z</version>
 </dependency>
 ```
@@ -239,8 +232,8 @@ The build produces (replacing `x.y.z` with the effective version):
 ## Extending
 
 To plug in a different PDF/A-3 validator (or none at all), implement
-`com.helger.flugesel.core.validate.IPdfA3ValidatorSPI` and register the class via
-`META-INF/services/com.helger.flugesel.core.validate.IPdfA3ValidatorSPI`. The validator is
+`com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI` and register the class via
+`META-INF/services/com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI`. The validator is
 discovered via `ServiceLoader`; only the first implementation found is used.
 
 ## License
@@ -254,5 +247,5 @@ v0.9.0 - 2026-05-12 (in development)
 * Extraction: invoice XML, named attachments, full attachment list including Modification Date and MIME type.
 * Validation: BR-HYBRID-01 through BR-HYBRID-15 (and the BR-HYBRID-DE-*/-FR-* country
   variants) plus PDF/A-3 conformance via the `IPdfA3ValidatorSPI` SPI implemented by
-  `flugesel-verapdf` using veraPDF 1.28.1 (`-jakarta` artifact line, JAXB 4.x only).
+  `kaltblut-verapdf` using veraPDF 1.28.1 (`-jakarta` artifact line, JAXB 4.x only).
 * Command-line client with subcommands `inspect`, `extract`, `attachments`, `validate`.

@@ -24,13 +24,13 @@
     <artifactId>parent-pom</artifactId>
     <version>3.0.3</version>
   </parent>
-  <groupId>com.helger.flugesel</groupId>
-  <artifactId>flugesel-parent-pom</artifactId>
+  <groupId>com.helger.kaltblut</groupId>
+  <artifactId>kaltblut-parent-pom</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>flugesel-parent-pom</name>
-  <description>Base POM to build flugesel - a ZUGFeRD / Factur-X hybrid invoice toolkit (detect, extract, validate)</description>
-  <url>https://github.com/phax/flugesel</url>
+  <name>kaltblut-parent-pom</name>
+  <description>Base POM to build kaltblut - a ZUGFeRD / Factur-X hybrid invoice toolkit (detect, extract, validate)</description>
+  <url>https://github.com/phax/kaltblut</url>
   <inceptionYear>2026</inceptionYear>
 
   <licenses>
@@ -42,9 +42,9 @@
   </licenses>
 
   <scm>
-    <connection>scm:git:https://github.com/phax/flugesel.git</connection>
-    <developerConnection>scm:git:https://github.com/phax/flugesel.git</developerConnection>
-    <url>https://github.com/phax/flugesel</url>
+    <connection>scm:git:https://github.com/phax/kaltblut.git</connection>
+    <developerConnection>scm:git:https://github.com/phax/kaltblut.git</developerConnection>
+    <url>https://github.com/phax/kaltblut</url>
     <tag>HEAD</tag>
   </scm>
 
@@ -90,18 +90,18 @@
       </dependency>
 
       <dependency>
-        <groupId>com.helger.flugesel</groupId>
-        <artifactId>flugesel-testfiles</artifactId>
+        <groupId>com.helger.kaltblut</groupId>
+        <artifactId>kaltblut-testfiles</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.helger.flugesel</groupId>
-        <artifactId>flugesel-core</artifactId>
+        <groupId>com.helger.kaltblut</groupId>
+        <artifactId>kaltblut-core</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.helger.flugesel</groupId>
-        <artifactId>flugesel-verapdf</artifactId>
+        <groupId>com.helger.kaltblut</groupId>
+        <artifactId>kaltblut-verapdf</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>
@@ -116,9 +116,9 @@
   </dependencies>
 
   <modules>
-    <module>flugesel-testfiles</module>
-    <module>flugesel-core</module>
-    <module>flugesel-verapdf</module>
-    <module>flugesel-cli</module>
+    <module>kaltblut-testfiles</module>
+    <module>kaltblut-core</module>
+    <module>kaltblut-verapdf</module>
+    <module>kaltblut-cli</module>
   </modules>
 </project>
