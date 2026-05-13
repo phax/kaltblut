@@ -246,7 +246,7 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
-v0.9.0 - work in progress
+v0.9.0 - 2026-05-13
 * Detection: recognises all five XMP extension-schema namespaces seen across ZUGFeRD 1.0, 2.0.1, 2.1, 2.2, 2.3, 2.3.2, 2.3.3 and 2.4.
 * Extraction: invoice XML, named attachments, full attachment list including Modification Date and MIME type.
 * Validation: BR-HYBRID-01 through BR-HYBRID-15 (and the BR-HYBRID-DE-*/-FR-* country
