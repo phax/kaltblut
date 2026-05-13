@@ -22,7 +22,7 @@
   <parent>
     <groupId>com.helger.kaltblut</groupId>
     <artifactId>kaltblut-parent-pom</artifactId>
-    <version>0.9.0</version>
+    <version>0.9.1-SNAPSHOT</version>
   </parent>
   <artifactId>kaltblut-verapdf</artifactId>
   <packaging>jar</packaging>
