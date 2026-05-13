@@ -1,5 +1,10 @@
 # Kaltblut
 
+<!-- ph-badge-start -->
+[![Sonatype Central](https://maven-badges.sml.io/sonatype-central/com.helger.kaltblut/kaltblut-parent-pom/badge.svg)](https://maven-badges.sml.io/sonatype-central/com.helger.kaltblut/kaltblut-parent-pom/)
+[![javadoc](https://javadoc.io/badge2/com.helger.kaltblut/kaltblut-testfiles/javadoc.svg)](https://javadoc.io/doc/com.helger.kaltblut/kaltblut-testfiles)
+<!-- ph-badge-end -->
+
 A Java toolkit for working with **ZUGFeRD / Factur-X** hybrid invoices: detect the flavor of any
 hybrid PDF, extract the embedded XML and supporting attachments, and validate the carrier-side
 specification rules — including PDF/A-3 conformance via [veraPDF](https://verapdf.org/).
