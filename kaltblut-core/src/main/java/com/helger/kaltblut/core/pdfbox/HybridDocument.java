@@ -129,11 +129,12 @@ public final class HybridDocument implements AutoCloseable
    *        the limits. May not be <code>null</code>; use {@link HybridLimits#UNLIMITED} to disable.
    * @return an opened document; close it via {@link #close()}.
    * @throws IOException
-   *         on I/O or PDF-parsing failure, or if the source exceeds <code>aLimits.getMaxPdfBytes()</code>.
+   *         on I/O or PDF-parsing failure, or if the source exceeds
+   *         <code>aLimits.getMaxPdfBytes()</code>.
    */
   @NonNull
-  public static HybridDocument open (@NonNull final IHybridSource aSource,
-                                     @NonNull final HybridLimits aLimits) throws IOException
+  public static HybridDocument open (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
+                                                                                                                throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");
@@ -404,10 +405,7 @@ public final class HybridDocument implements AutoCloseable
 
         final int nMaxCount = m_aLimits.getMaxAttachmentCount ();
         if (nMaxCount >= 0 && aAll.size () > nMaxCount)
-          throw new IOException ("Embedded file count " +
-                                 aAll.size () +
-                                 " exceeds limit of " +
-                                 nMaxCount);
+          throw new IOException ("Embedded file count " + aAll.size () + " exceeds limit of " + nMaxCount);
 
         final long nMaxPer = m_aLimits.getMaxAttachmentBytes ();
         final long nMaxAggregate = m_aLimits.getMaxAggregateAttachmentBytes ();

@@ -57,7 +57,8 @@ public enum EZugferdCountry implements IHasID <String>
   }
 
   @Nullable
-  public static EZugferdCountry getFromIDOrDefault (@Nullable final String sID, @Nullable final EZugferdCountry eDefault)
+  public static EZugferdCountry getFromIDOrDefault (@Nullable final String sID,
+                                                    @Nullable final EZugferdCountry eDefault)
   {
     return EnumHelper.getFromIDOrDefault (EZugferdCountry.class, sID, eDefault);
   }

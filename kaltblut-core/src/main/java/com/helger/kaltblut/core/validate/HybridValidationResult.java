@@ -28,9 +28,9 @@ import com.helger.collection.commons.ICommonsList;
 
 /**
  * Aggregated result of a {@link HybridValidator#validate} run. Carries the ordered list of
- * {@link HybridValidationLayer}s (typically {@link EHybridValidationLayerKind#BR_HYBRID} followed by
- * {@link EHybridValidationLayerKind#PDF_A3} when enabled). Convenience predicates aggregate findings
- * across all layers.
+ * {@link HybridValidationLayer}s (typically {@link EHybridValidationLayerKind#BR_HYBRID} followed
+ * by {@link EHybridValidationLayerKind#PDF_A3} when enabled). Convenience predicates aggregate
+ * findings across all layers.
  *
  * @author Philip Helger
  */

@@ -29,8 +29,8 @@ import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 
 /**
- * One logical layer of a {@link HybridValidator} run: a {@link EHybridValidationLayerKind kind}, the
- * wall-clock duration of that layer, and its ordered {@link HybridFinding}s.
+ * One logical layer of a {@link HybridValidator} run: a {@link EHybridValidationLayerKind kind},
+ * the wall-clock duration of that layer, and its ordered {@link HybridFinding}s.
  *
  * @author Philip Helger
  * @since 0.9.1

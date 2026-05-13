@@ -103,8 +103,8 @@ public final class HybridValidator
     }
     aSwBrHybrid.stop ();
     aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.BR_HYBRID,
-                                      Duration.ofMillis (aSwBrHybrid.getMillis ()),
-                                      aBrHybridFindings));
+                                            Duration.ofMillis (aSwBrHybrid.getMillis ()),
+                                            aBrHybridFindings));
 
     // Layer 2: PDF/A-3 (optional)
     if (m_aSettings.isCheckPdfA3 ())
@@ -125,8 +125,8 @@ public final class HybridValidator
       }
       aSwPdfA.stop ();
       aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.PDF_A3,
-                                        Duration.ofMillis (aSwPdfA.getMillis ()),
-                                        aPdfAFindings));
+                                              Duration.ofMillis (aSwPdfA.getMillis ()),
+                                              aPdfAFindings));
     }
 
     return new HybridValidationResult (aLayers);
