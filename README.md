@@ -3,6 +3,8 @@
 <!-- ph-badge-start -->
 [![Sonatype Central](https://maven-badges.sml.io/sonatype-central/com.helger.kaltblut/kaltblut-parent-pom/badge.svg)](https://maven-badges.sml.io/sonatype-central/com.helger.kaltblut/kaltblut-parent-pom/)
 [![javadoc](https://javadoc.io/badge2/com.helger.kaltblut/kaltblut-testfiles/javadoc.svg)](https://javadoc.io/doc/com.helger.kaltblut/kaltblut-testfiles)
+
+> If this project saved you some time or made your day a little easier, a star would mean a lot — it helps others find it too.
 <!-- ph-badge-end -->
 
 A Java toolkit for working with **ZUGFeRD / Factur-X** hybrid invoices: detect the flavor of any
