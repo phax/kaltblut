@@ -65,8 +65,11 @@ public final class KaltblutTestFiles
   public static final String ZF_2_3_MINIMUM = PREFIX + "2.3/MINIMUM_Buchungshilfe.pdf";
 
   /**
-   * ZUGFeRD 2.4 BASIC WL sample. Latest published spec generation; PDF carrier rules are identical
-   * to 2.3.
+   * ZUGFeRD 2.4 BASIC WL sample. PDF carrier rules are identical to 2.3.
+   * <p>
+   * Note: the ZUGFeRD 2.5 release shipped this exact same PDF (byte-identical) as its BASIC WL
+   * sample, so this resource doubles as the 2.5 sample. PDF-carrier-wise 2.5 == 2.4, with the
+   * single exception of {@code XLS} being added to the §6.4 attachment whitelist.
    */
   public static final String ZF_2_4_BASIC_WL = PREFIX + "2.4/BASIC-WL_Einfach_fx.pdf";
 

@@ -17,7 +17,7 @@ project; use [phive-rules-zugferd](https://github.com/phax/phive-rules) for thos
 Per-version requirements analysis used to design this library lives under
 [`docs/requirements/`](docs/requirements/). See
 [`docs/requirements/comparison.md`](docs/requirements/comparison.md) for a cross-version overview
-of every PDF carrier rule from ZUGFeRD 1.0 (2014) through Factur-X 1.08 / ZUGFeRD 2.4 (2025-12-04).
+of every PDF carrier rule from ZUGFeRD 1.0 (2014) through Factur-X 1.09 / ZUGFeRD 2.5 (2026-06-10).
 
 ## Supported Versions
 
@@ -35,6 +35,7 @@ The detection table covers every published release since 2014:
 | 2.3.2   | 1.07.2   | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 | 2.3.3   | 1.07.3   | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 | 2.4     | 1.08     | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
+| 2.5     | 1.09     | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 
 ## Why "Kaltblut"?
 
@@ -287,6 +288,9 @@ discovered via `ServiceLoader`; only the first implementation found is used.
 Apache License, Version 2.0.
 
 ## News and Noteworthy
+
+v0.9.2 - 2026-06-10
+* Added support for ZUGFeRD v2.5
 
 v0.9.1 - 2026-05-13
 * Validation: the result of `HybridValidator.validate` is now structured as a list of
