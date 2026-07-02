@@ -72,11 +72,11 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
     }
   }
 
-  private static boolean _isAcceptable (@NonNull final PDFAFlavour eF)
+  private static boolean _isAcceptable (@NonNull final PDFAFlavour eFlavour)
   {
-    if (eF == null || eF == PDFAFlavour.NO_FLAVOUR)
+    if (eFlavour == null || eFlavour == PDFAFlavour.NO_FLAVOUR)
       return false;
-    final String sID = eF.getId ();
+    final String sID = eFlavour.getId ();
     return sID != null && (sID.startsWith ("3") || "4f".equals (sID));
   }
 
@@ -139,6 +139,7 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
 
             for (final TestAssertion aTA : aRes.getTestAssertions ())
               if (aTA.getStatus () == Status.FAILED)
+              {
                 aOut.add (new HybridFinding ("VERAPDF-" +
                                              aTA.getRuleId ().getClause () +
                                              "-" +
@@ -146,12 +147,15 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
                                              EHybridSeverity.ERROR,
                                              aTA.getMessage (),
                                              aTA.getLocation () != null ? aTA.getLocation ().getContext () : null));
+              }
 
             if (aOut.isEmpty () && !aRes.isCompliant ())
+            {
               aOut.add (new HybridFinding ("VERAPDF",
                                            EHybridSeverity.ERROR,
                                            "PDF/A validation reported non-compliance but produced no detailed assertions.",
                                            null));
+            }
           }
         }
         aSpan.setAttribute ("kaltblut.pdfa.finding_count", aOut.size ());
