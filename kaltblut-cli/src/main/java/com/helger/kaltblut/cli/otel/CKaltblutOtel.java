@@ -17,6 +17,7 @@
 package com.helger.kaltblut.cli.otel;
 
 import com.helger.annotation.concurrent.Immutable;
+import com.helger.kaltblut.core.CKaltblutVersion;
 
 /**
  * OpenTelemetry-related constants for the kaltblut CLI.
@@ -30,10 +31,10 @@ public final class CKaltblutOtel
   public static final String INSTRUMENTATION_SCOPE_NAME = "com.helger.kaltblut";
 
   /**
-   * The OpenTelemetry instrumentation scope version. Kept in sync manually with the parent POM
-   * version; it is informational only and does not affect span correlation.
+   * The OpenTelemetry instrumentation scope version. Derived from the build version; it is
+   * informational only and does not affect span correlation.
    */
-  public static final String INSTRUMENTATION_SCOPE_VERSION = "0.9.3";
+  public static final String INSTRUMENTATION_SCOPE_VERSION = CKaltblutVersion.BUILD_VERSION;
 
   /**
    * System property / environment variable that opts the CLI in to installing the OpenTelemetry SDK.

@@ -60,7 +60,9 @@ As a bonus, *kaltblütig* in everyday German also means "cool-headed" — a usef
 This is a multi-module Maven project:
 
 - `kaltblut-core` — the library. Source abstraction, model, inspector, extractor, validator.
-  Classes live under `com.helger.kaltblut.core.*`.
+  Classes live under `com.helger.kaltblut.core.*`. Emits tracing spans through the vendor-neutral
+  [ph-telemetry](https://github.com/phax/ph-telemetry) facade — no OpenTelemetry dependency (see
+  [Telemetry](#telemetry-opentelemetry)).
 - `kaltblut-testfiles` — shared test fixtures (sample PDFs + classpath-resource locator).
 - `kaltblut-verapdf` — PDF/A-3 validation adapter that wires veraPDF to the
   `IPdfA3ValidatorSPI` SPI. Optional; pull it in only if you need PDF/A-3 conformance checks.
@@ -276,6 +278,55 @@ The build produces (replacing `x.y.z` with the effective version):
 </dependency>
 ```
 
+`kaltblut-core` transitively pulls the `com.helger.telemetry:ph-telemetry` facade only; no
+OpenTelemetry ends up on your classpath unless you add a binding yourself (see
+[Telemetry](#telemetry-opentelemetry)).
+
+## Telemetry (OpenTelemetry)
+
+Kaltblut is instrumented for distributed tracing via the vendor-neutral
+[ph-telemetry](https://github.com/phax/ph-telemetry) facade. The library modules depend only on the
+facade, **not** on OpenTelemetry: when no tracer is registered every span is a cheap no-op, so
+there is zero runtime cost and zero extra dependency for callers that do not want telemetry.
+
+The public entry points emit spans that nest into a single trace (a caller-side waterfall):
+
+| Span                                             | Emitted by                     | Kind     |
+| ------------------------------------------------ | ------------------------------ | -------- |
+| `kaltblut.inspect`                               | `HybridInspector.readMetadata` | INTERNAL |
+| `kaltblut.extract` (`operation` attribute)       | `HybridExtractor` (all three funnels) | INTERNAL |
+| `kaltblut.validate` + `kaltblut.validate.brhybrid` | `HybridValidator.validate`   | INTERNAL |
+| `kaltblut.source.read`                           | reading the raw PDF bytes      | CLIENT   |
+| `kaltblut.pdf.open`                              | PDFBox parse (`Loader.loadPDF`) | INTERNAL |
+| `kaltblut.xmp.parse`                             | XMP metadata parse             | INTERNAL |
+| `kaltblut.attachments.extract`                   | embedded-file extraction       | INTERNAL |
+| `kaltblut.pdfa3.validate` + `.parse` / `.check`  | `kaltblut-verapdf` PDF/A-3 run | CLIENT   |
+
+Spans carry attributes such as `kaltblut.source.size_bytes`, `kaltblut.flavor`,
+`kaltblut.profile`, `kaltblut.attachment.count`, `kaltblut.pdfa.flavour`,
+`kaltblut.pdfa.compliant`, and `kaltblut.findings.total`.
+
+### Enabling a backend
+
+To actually export spans, an application registers a `ph-telemetry` tracer SPI and installs an
+OpenTelemetry SDK. The `kaltblut-cli` module does exactly this — add
+`com.helger.telemetry:ph-telemetry-otel` plus the OpenTelemetry SDK/exporter to your own
+deployment module, register your `OtelTelemetryTracerSPI` subclass via
+`META-INF/services/com.helger.telemetry.ITelemetryTracerSPI`, and install the SDK once at startup
+(before the first span, since the binding caches the resolved tracer).
+
+The CLI keeps telemetry **opt-in**: it installs the SDK only when `-Dotel.enabled=true` (or the
+`OTEL_ENABLED=true` environment variable) is set. All endpoint / exporter / sampling configuration
+comes from the standard OpenTelemetry environment variables:
+
+```shell
+# Export CLI traces to an OTLP collector (e.g. grafana/otel-lgtm on localhost)
+OTEL_ENABLED=true \
+OTEL_SERVICE_NAME=kaltblut \
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
+  java -jar kaltblut-cli-full.jar validate invoice.pdf
+```
+
 ## Extending
 
 To plug in a different PDF/A-3 validator (or none at all), implement
@@ -288,6 +339,15 @@ discovered via `ServiceLoader`; only the first implementation found is used.
 Apache License, Version 2.0.
 
 ## News and Noteworthy
+
+v0.9.3 - 2026-07-02
+* Added distributed-tracing instrumentation via the vendor-neutral
+  [ph-telemetry](https://github.com/phax/ph-telemetry) facade. `kaltblut-core` and
+  `kaltblut-verapdf` emit spans around the usual hotspots (source read, PDFBox parse, XMP parse,
+  attachment extraction, BR-HYBRID + PDF/A-3 validation) and degrade to no-ops when no tracer is
+  registered — no OpenTelemetry dependency is added to the library. The `kaltblut-cli` module ships
+  an opt-in OpenTelemetry binding (`-Dotel.enabled=true` / `OTEL_ENABLED=true`). See
+  [Telemetry](#telemetry-opentelemetry).
 
 v0.9.2 - 2026-06-10
 * Added support for ZUGFeRD v2.5

@@ -127,6 +127,9 @@ endpoint/exporter config comes from the standard `OTEL_*` env vars). The SDK mus
 before the first span because the ph-telemetry-otel binding caches the resolved tracer on first
 use.
 
+The instrumentation scope is defined in `CKaltblutOtel`: name `com.helger.kaltblut`, version from
+`CKaltblutVersion.BUILD_VERSION` (do not hardcode the version).
+
 ## Coding conventions specific to this codebase
 
 The user's global rules (`~/.claude/rules/`) define naming and formatting conventions

@@ -27,11 +27,12 @@ import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 
 /**
- * Opt-in bootstrap of the OpenTelemetry SDK for the kaltblut CLI. Installation is skipped unless the
- * user explicitly enables it via the system property {@code otel.enabled=true} or the environment
- * variable {@code OTEL_ENABLED=true}. All exporter / endpoint / sampling configuration is applied
- * through the standard OpenTelemetry environment variables (e.g. {@code OTEL_EXPORTER_OTLP_ENDPOINT},
- * {@code OTEL_SERVICE_NAME}, {@code OTEL_TRACES_EXPORTER}), which the SDK autoconfigure module reads.
+ * Opt-in bootstrap of the OpenTelemetry SDK for the kaltblut CLI. Installation is skipped unless
+ * the user explicitly enables it via the system property {@code otel.enabled=true} or the
+ * environment variable {@code OTEL_ENABLED=true}. All exporter / endpoint / sampling configuration
+ * is applied through the standard OpenTelemetry environment variables (e.g.
+ * {@code OTEL_EXPORTER_OTLP_ENDPOINT}, {@code OTEL_SERVICE_NAME}, {@code OTEL_TRACES_EXPORTER}),
+ * which the SDK autoconfigure module reads.
  *
  * @author Philip Helger
  */
@@ -46,6 +47,7 @@ public final class KaltblutOtelBootstrap
   {
     if ("true".equalsIgnoreCase (System.getProperty (CKaltblutOtel.PROPERTY_OTEL_ENABLED)))
       return true;
+
     return "true".equalsIgnoreCase (System.getenv ("OTEL_ENABLED"));
   }
 
@@ -62,9 +64,9 @@ public final class KaltblutOtelBootstrap
   {
     if (!_isEnabled ())
     {
-      // Telemetry is off. Silence the one-time JUL INFO hint that GlobalOpenTelemetry emits when the
-      // autoconfigure module is on the classpath but not enabled - it would otherwise print on the
-      // first span of every CLI run.
+      // Telemetry is off. Silence the one-time JUL INFO hint that GlobalOpenTelemetry emits when
+      // the autoconfigure module is on the classpath but not enabled - it would otherwise print on
+      // the first span of every CLI run.
       java.util.logging.Logger.getLogger ("io.opentelemetry.api.GlobalOpenTelemetry").setLevel (Level.WARNING);
       return null;
     }
@@ -88,10 +90,11 @@ public final class KaltblutOtelBootstrap
    */
   public static void shutdown (@Nullable final OpenTelemetrySdk aSdk)
   {
-    if (aSdk == null)
-      return;
-    aSdk.getSdkTracerProvider ().forceFlush ().join (10, TimeUnit.SECONDS);
-    aSdk.close ();
-    LOGGER.info ("Flushed and shut down the OpenTelemetry SDK");
+    if (aSdk != null)
+    {
+      aSdk.getSdkTracerProvider ().forceFlush ().join (10, TimeUnit.SECONDS);
+      aSdk.close ();
+      LOGGER.info ("Flushed and shut down the OpenTelemetry SDK");
+    }
   }
 }
