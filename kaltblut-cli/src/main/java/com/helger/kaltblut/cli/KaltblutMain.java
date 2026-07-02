@@ -16,6 +16,9 @@
  */
 package com.helger.kaltblut.cli;
 
+import com.helger.kaltblut.cli.otel.KaltblutOtelBootstrap;
+
+import io.opentelemetry.sdk.OpenTelemetrySdk;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -36,9 +39,19 @@ public final class KaltblutMain
 {
   public static void main (final String [] aArgs)
   {
-    final CommandLine cmd = new CommandLine (new KaltblutMain ());
-    cmd.setCaseInsensitiveEnumValuesAllowed (true);
-    final int nExitCode = cmd.execute (aArgs);
+    // Install the OpenTelemetry SDK (opt-in) before any span is created; null when disabled.
+    final OpenTelemetrySdk aSdk = KaltblutOtelBootstrap.initOrNull ();
+    int nExitCode;
+    try
+    {
+      final CommandLine cmd = new CommandLine (new KaltblutMain ());
+      cmd.setCaseInsensitiveEnumValuesAllowed (true);
+      nExitCode = cmd.execute (aArgs);
+    }
+    finally
+    {
+      KaltblutOtelBootstrap.shutdown (aSdk);
+    }
     System.exit (nExitCode);
   }
 }

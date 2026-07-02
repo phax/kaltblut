@@ -97,6 +97,36 @@ Key design choices to preserve:
   validator applies them uniformly. Country-specific variants exist (BR-HYBRID-DE-*,
   BR-HYBRID-FR-*) driven by `EZugferdCountry`.
 
+## Telemetry (tracing)
+
+The library is instrumented with **ph-telemetry** (`com.helger.telemetry:ph-telemetry`), a
+vendor-neutral tracing facade. `kaltblut-core` and `kaltblut-verapdf` depend only on the facade —
+no OpenTelemetry on their classpath. When no tracer SPI is registered every span is a cheap no-op,
+so the library emits spans unconditionally. Because the public entry points throw `IOException`,
+instrumentation uses `Telemetry.withSpanThrowing (...)` / `startSpan (...)` (checked-exception
+variants), never the plain `withSpan`.
+
+Spans (nest via OTel thread-local context into a waterfall):
+
+| Span | Where | Kind |
+| ---- | ----- | ---- |
+| `kaltblut.inspect` | `HybridInspector.readMetadata` | INTERNAL |
+| `kaltblut.extract` | `HybridExtractor` (3 funnels; `operation` attr) | INTERNAL |
+| `kaltblut.validate` + `.brhybrid` | `HybridValidator.validate` | INTERNAL |
+| `kaltblut.source.read` | `HybridDocument.open` → `getBytes` | CLIENT |
+| `kaltblut.pdf.open` | `HybridDocument.open` → `Loader.loadPDF` | INTERNAL |
+| `kaltblut.xmp.parse` | `HybridDocument._doReadMetadata` | INTERNAL |
+| `kaltblut.attachments.extract` | `HybridDocument._doListAttachments` | INTERNAL |
+| `kaltblut.pdfa3.validate` + `.parse` / `.check` | `VeraPdfA3ValidatorSPI` | CLIENT |
+
+The real OpenTelemetry backend lives only at the deployment boundary (`kaltblut-cli`): it pulls
+`ph-telemetry-otel` + the OTel SDK, registers `KaltblutOtelTracerSPI` via
+`META-INF/services/com.helger.telemetry.ITelemetryTracerSPI`, and installs the SDK in
+`KaltblutMain` **only when opted in** via `-Dotel.enabled=true` or `OTEL_ENABLED=true` (all
+endpoint/exporter config comes from the standard `OTEL_*` env vars). The SDK must be installed
+before the first span because the ph-telemetry-otel binding caches the resolved tracer on first
+use.
+
 ## Coding conventions specific to this codebase
 
 The user's global rules (`~/.claude/rules/`) define naming and formatting conventions

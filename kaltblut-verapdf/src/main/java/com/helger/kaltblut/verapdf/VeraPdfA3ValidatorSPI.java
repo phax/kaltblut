@@ -39,6 +39,9 @@ import com.helger.kaltblut.core.source.IHybridSource;
 import com.helger.kaltblut.core.validate.EHybridSeverity;
 import com.helger.kaltblut.core.validate.HybridFinding;
 import com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI;
+import com.helger.telemetry.ETelemetrySpanKind;
+import com.helger.telemetry.ITelemetrySpan;
+import com.helger.telemetry.Telemetry;
 
 /**
  * veraPDF-backed implementation of {@link IPdfA3ValidatorSPI}. Registered via
@@ -84,55 +87,90 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
     _ensureInitialised ();
 
     final ICommonsList <HybridFinding> aOut = new CommonsArrayList <> ();
-    try (final InputStream aIS = new NonBlockingByteArrayInputStream (aSource.getBytes ()))
+    // Span: the full PDF/A-3 conformance run - the single most expensive operation in kaltblut.
+    // Modelled as CLIENT because it delegates to the external veraPDF engine.
+    try (final ITelemetrySpan aSpan = Telemetry.startSpan ("kaltblut.pdfa3.validate", ETelemetrySpanKind.CLIENT))
     {
-      try (final PDFAParser aParser = Foundries.defaultInstance ().createParser (aIS, PDFAFlavour.NO_FLAVOUR))
+      if (aSource.getName () != null)
+        aSpan.setAttribute ("kaltblut.source.name", aSource.getName ());
+      try (final InputStream aIS = new NonBlockingByteArrayInputStream (aSource.getBytes ()))
       {
-        final PDFAFlavour eDetected = aParser.getFlavour ();
-        if (!_isAcceptable (eDetected))
+        try (final PDFAParser aParser = Foundries.defaultInstance ().createParser (aIS, PDFAFlavour.NO_FLAVOUR))
         {
-          aOut.add (new HybridFinding ("VERAPDF-FLAVOUR",
-                                       EHybridSeverity.ERROR,
-                                       "PDF/A flavor '" +
-                                                              eDetected +
-                                                              "' is not acceptable for a hybrid invoice. " +
-                                                              "Expected PDF/A-3 (3a, 3b or 3u) or PDF/A-4f.",
-                                       null));
-          return aOut;
-        }
+          // Sub-span: parsing + flavour detection.
+          final PDFAFlavour eDetected;
+          try (final ITelemetrySpan aSpanParse = Telemetry.startSpan ("kaltblut.pdfa3.parse",
+                                                                      ETelemetrySpanKind.INTERNAL))
+          {
+            eDetected = aParser.getFlavour ();
+            aSpanParse.setAttribute ("kaltblut.pdfa.flavour", String.valueOf (eDetected));
+            aSpanParse.setStatusOk ();
+          }
+          aSpan.setAttribute ("kaltblut.pdfa.flavour", String.valueOf (eDetected));
 
-        try (final PDFAValidator aValidator = Foundries.defaultInstance ().createValidator (eDetected, false))
-        {
-          final ValidationResult aRes = aValidator.validate (aParser);
-          for (final TestAssertion aTA : aRes.getTestAssertions ())
-            if (aTA.getStatus () == Status.FAILED)
-              aOut.add (new HybridFinding ("VERAPDF-" +
-                                           aTA.getRuleId ().getClause () +
-                                           "-" +
-                                           aTA.getRuleId ().getTestNumber (),
-                                           EHybridSeverity.ERROR,
-                                           aTA.getMessage (),
-                                           aTA.getLocation () != null ? aTA.getLocation ().getContext () : null));
-
-          if (aOut.isEmpty () && !aRes.isCompliant ())
-            aOut.add (new HybridFinding ("VERAPDF",
+          if (!_isAcceptable (eDetected))
+          {
+            aOut.add (new HybridFinding ("VERAPDF-FLAVOUR",
                                          EHybridSeverity.ERROR,
-                                         "PDF/A validation reported non-compliance but produced no detailed assertions.",
+                                         "PDF/A flavor '" +
+                                                                eDetected +
+                                                                "' is not acceptable for a hybrid invoice. " +
+                                                                "Expected PDF/A-3 (3a, 3b or 3u) or PDF/A-4f.",
                                          null));
+            aSpan.setAttribute ("kaltblut.pdfa.acceptable", false);
+            aSpan.setAttribute ("kaltblut.pdfa.finding_count", aOut.size ());
+            aSpan.setStatusOk ();
+            return aOut;
+          }
+          aSpan.setAttribute ("kaltblut.pdfa.acceptable", true);
+
+          try (final PDFAValidator aValidator = Foundries.defaultInstance ().createValidator (eDetected, false))
+          {
+            // Sub-span: the actual rule evaluation.
+            final ValidationResult aRes;
+            try (final ITelemetrySpan aSpanCheck = Telemetry.startSpan ("kaltblut.pdfa3.check",
+                                                                        ETelemetrySpanKind.INTERNAL))
+            {
+              aRes = aValidator.validate (aParser);
+              aSpanCheck.setAttribute ("kaltblut.pdfa.compliant", aRes.isCompliant ());
+              aSpanCheck.setStatusOk ();
+            }
+            aSpan.setAttribute ("kaltblut.pdfa.compliant", aRes.isCompliant ());
+
+            for (final TestAssertion aTA : aRes.getTestAssertions ())
+              if (aTA.getStatus () == Status.FAILED)
+                aOut.add (new HybridFinding ("VERAPDF-" +
+                                             aTA.getRuleId ().getClause () +
+                                             "-" +
+                                             aTA.getRuleId ().getTestNumber (),
+                                             EHybridSeverity.ERROR,
+                                             aTA.getMessage (),
+                                             aTA.getLocation () != null ? aTA.getLocation ().getContext () : null));
+
+            if (aOut.isEmpty () && !aRes.isCompliant ())
+              aOut.add (new HybridFinding ("VERAPDF",
+                                           EHybridSeverity.ERROR,
+                                           "PDF/A validation reported non-compliance but produced no detailed assertions.",
+                                           null));
+          }
         }
+        aSpan.setAttribute ("kaltblut.pdfa.finding_count", aOut.size ());
+        aSpan.setStatusOk ();
       }
-    }
-    catch (final IOException ex)
-    {
-      throw ex;
-    }
-    catch (final Exception ex)
-    {
-      LOGGER.warn ("veraPDF validation failed", ex);
-      aOut.add (new HybridFinding ("VERAPDF-ERROR",
-                                   EHybridSeverity.WARNING,
-                                   "veraPDF validation failed: " + ex.getMessage (),
-                                   null));
+      catch (final IOException ex)
+      {
+        aSpan.recordException (ex).setStatusError (ex.getMessage ());
+        throw ex;
+      }
+      catch (final Exception ex)
+      {
+        LOGGER.warn ("veraPDF validation failed", ex);
+        aSpan.recordException (ex).setStatusError (ex.getMessage ());
+        aOut.add (new HybridFinding ("VERAPDF-ERROR",
+                                     EHybridSeverity.WARNING,
+                                     "veraPDF validation failed: " + ex.getMessage (),
+                                     null));
+      }
     }
     return aOut;
   }

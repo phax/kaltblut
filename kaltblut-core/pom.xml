@@ -62,6 +62,12 @@
       <groupId>com.helger.commons</groupId>
       <artifactId>ph-xml</artifactId>
     </dependency>
+    <!-- Telemetry facade only; degrades to no-ops when no SPI is registered, so this stays free of
+         any OpenTelemetry dependency. -->
+    <dependency>
+      <groupId>com.helger.telemetry</groupId>
+      <artifactId>ph-telemetry</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.pdfbox</groupId>

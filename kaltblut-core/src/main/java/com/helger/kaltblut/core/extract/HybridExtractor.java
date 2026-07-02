@@ -29,6 +29,8 @@ import com.helger.kaltblut.core.model.HybridAttachment;
 import com.helger.kaltblut.core.pdfbox.HybridDocument;
 import com.helger.kaltblut.core.source.HybridLimits;
 import com.helger.kaltblut.core.source.IHybridSource;
+import com.helger.telemetry.ETelemetrySpanKind;
+import com.helger.telemetry.Telemetry;
 
 /**
  * Tier 2: extraction of the invoice XML and any supporting embedded files.
@@ -82,11 +84,21 @@ public final class HybridExtractor
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");
-    return HybridDocument.withOpenDocument (aSource, aLimits, aDoc -> {
-      for (final HybridAttachment aAtt : aDoc.listAttachments ())
-        if (aAtt.isInvoiceXml ())
-          return aAtt.getBytes ();
-      return null;
+    return Telemetry.withSpanThrowing ("kaltblut.extract", ETelemetrySpanKind.INTERNAL, aSpan -> {
+      aSpan.setAttribute ("kaltblut.extract.operation", "invoiceXml");
+      if (aSource.getName () != null)
+        aSpan.setAttribute ("kaltblut.source.name", aSource.getName ());
+
+      final byte [] aRet = HybridDocument.withOpenDocument (aSource, aLimits, aDoc -> {
+        for (final HybridAttachment aAtt : aDoc.listAttachments ())
+          if (aAtt.isInvoiceXml ())
+            return aAtt.getBytes ();
+        return null;
+      });
+
+      aSpan.setAttribute ("kaltblut.extract.found", aRet != null);
+      aSpan.setStatusOk ();
+      return aRet;
     });
   }
 
@@ -122,10 +134,20 @@ public final class HybridExtractor
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");
-    final ICommonsList <HybridAttachment> aResult = HybridDocument.withOpenDocument (aSource,
-                                                                                     aLimits,
-                                                                                     HybridDocument::listAttachments);
-    return aResult != null ? aResult : new CommonsArrayList <> ();
+    return Telemetry.withSpanThrowing ("kaltblut.extract", ETelemetrySpanKind.INTERNAL, aSpan -> {
+      aSpan.setAttribute ("kaltblut.extract.operation", "listAttachments");
+      if (aSource.getName () != null)
+        aSpan.setAttribute ("kaltblut.source.name", aSource.getName ());
+
+      final ICommonsList <HybridAttachment> aResult = HybridDocument.withOpenDocument (aSource,
+                                                                                       aLimits,
+                                                                                       HybridDocument::listAttachments);
+
+      final ICommonsList <HybridAttachment> aRet = aResult != null ? aResult : new CommonsArrayList <> ();
+      aSpan.setAttribute ("kaltblut.attachment.count", aRet.size ());
+      aSpan.setStatusOk ();
+      return aRet;
+    });
   }
 
   /**
@@ -168,11 +190,20 @@ public final class HybridExtractor
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (sName, "Name");
     ValueEnforcer.notNull (aLimits, "Limits");
-    return HybridDocument.withOpenDocument (aSource, aLimits, aDoc -> {
-      for (final HybridAttachment aAtt : aDoc.listAttachments ())
-        if (sName.equals (aAtt.getName ()))
-          return aAtt.getBytes ();
-      return null;
+    return Telemetry.withSpanThrowing ("kaltblut.extract", ETelemetrySpanKind.INTERNAL, aSpan -> {
+      aSpan.setAttribute ("kaltblut.extract.operation", "attachment");
+      aSpan.setAttribute ("kaltblut.attachment.name", sName);
+
+      final byte [] aRet = HybridDocument.withOpenDocument (aSource, aLimits, aDoc -> {
+        for (final HybridAttachment aAtt : aDoc.listAttachments ())
+          if (sName.equals (aAtt.getName ()))
+            return aAtt.getBytes ();
+        return null;
+      });
+
+      aSpan.setAttribute ("kaltblut.extract.found", aRet != null);
+      aSpan.setStatusOk ();
+      return aRet;
     });
   }
 }

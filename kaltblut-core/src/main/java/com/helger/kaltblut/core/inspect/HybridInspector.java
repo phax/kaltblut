@@ -29,6 +29,8 @@ import com.helger.kaltblut.core.model.HybridMetadata;
 import com.helger.kaltblut.core.pdfbox.HybridDocument;
 import com.helger.kaltblut.core.source.HybridLimits;
 import com.helger.kaltblut.core.source.IHybridSource;
+import com.helger.telemetry.ETelemetrySpanKind;
+import com.helger.telemetry.Telemetry;
 
 /**
  * Tier 1: detection and metadata reading for hybrid invoices.
@@ -176,6 +178,18 @@ public final class HybridInspector
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");
-    return HybridDocument.withOpenDocument (aSource, aLimits, HybridDocument::readMetadata);
+    return Telemetry.withSpanThrowing ("kaltblut.inspect", ETelemetrySpanKind.INTERNAL, aSpan -> {
+      if (aSource.getName () != null)
+        aSpan.setAttribute ("kaltblut.source.name", aSource.getName ());
+
+      final HybridMetadata aMeta = HybridDocument.withOpenDocument (aSource, aLimits, HybridDocument::readMetadata);
+
+      if (aMeta.getFlavor () != null)
+        aSpan.setAttribute ("kaltblut.flavor", aMeta.getFlavor ().name ());
+      if (aMeta.getProfile () != null)
+        aSpan.setAttribute ("kaltblut.profile", aMeta.getProfile ().getID ());
+      aSpan.setStatusOk ();
+      return aMeta;
+    });
   }
 }

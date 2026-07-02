@@ -38,6 +38,9 @@ import com.helger.kaltblut.core.model.HybridAttachment;
 import com.helger.kaltblut.core.model.HybridMetadata;
 import com.helger.kaltblut.core.pdfbox.HybridDocument;
 import com.helger.kaltblut.core.source.IHybridSource;
+import com.helger.telemetry.ETelemetrySpanKind;
+import com.helger.telemetry.ITelemetrySpan;
+import com.helger.telemetry.Telemetry;
 
 /**
  * Tier 3 validation: applies the BR-HYBRID-* business rules and (when configured) PDF/A-3
@@ -83,53 +86,73 @@ public final class HybridValidator
   {
     ValueEnforcer.notNull (aSource, "Source");
 
-    final ICommonsList <HybridValidationLayer> aLayers = new CommonsArrayList <> ();
+    return Telemetry.withSpanThrowing ("kaltblut.validate", ETelemetrySpanKind.INTERNAL, aSpanValidate -> {
+      if (aSource.getName () != null)
+        aSpanValidate.setAttribute ("kaltblut.source.name", aSource.getName ());
+      aSpanValidate.setAttribute ("kaltblut.country", m_aSettings.getCountry ().getID ());
+      aSpanValidate.setAttribute ("kaltblut.check.pdfa3", m_aSettings.isCheckPdfA3 ());
 
-    // Layer 1: BR-HYBRID business rules
-    final ICommonsList <HybridFinding> aBrHybridFindings = new CommonsArrayList <> ();
-    boolean bXmlExtractable = false;
-    final StopWatch aSwBrHybrid = StopWatch.createdStarted ();
-    try (final HybridDocument aDoc = HybridDocument.open (aSource, m_aSettings.getLimits ()))
-    {
-      final HybridMetadata aMeta = aDoc.readMetadata ();
-      final ICommonsList <HybridAttachment> aAttachments = aDoc.listAttachments ();
-      for (final HybridAttachment aAtt : aAttachments)
-        if (aAtt.isInvoiceXml () && aAtt.getSize () > 0)
+      final ICommonsList <HybridValidationLayer> aLayers = new CommonsArrayList <> ();
+
+      // Layer 1: BR-HYBRID business rules
+      final ICommonsList <HybridFinding> aBrHybridFindings = new CommonsArrayList <> ();
+      boolean bXmlExtractable = false;
+      final StopWatch aSwBrHybrid = StopWatch.createdStarted ();
+      // Manual span (not withSpan) so that bXmlExtractable can escape to the PDF/A downgrade logic.
+      // The nested source.read / pdf.open / xmp.parse / attachments spans attach under this one.
+      try (final ITelemetrySpan aSpanBr = Telemetry.startSpan ("kaltblut.validate.brhybrid",
+                                                               ETelemetrySpanKind.INTERNAL))
+      {
+        try (final HybridDocument aDoc = HybridDocument.open (aSource, m_aSettings.getLimits ()))
         {
-          bXmlExtractable = true;
-          break;
+          final HybridMetadata aMeta = aDoc.readMetadata ();
+          final ICommonsList <HybridAttachment> aAttachments = aDoc.listAttachments ();
+          for (final HybridAttachment aAtt : aAttachments)
+            if (aAtt.isInvoiceXml () && aAtt.getSize () > 0)
+            {
+              bXmlExtractable = true;
+              break;
+            }
+          _applyBrHybrid (aBrHybridFindings, aMeta);
         }
-      _applyBrHybrid (aBrHybridFindings, aMeta);
-    }
-    aSwBrHybrid.stop ();
-    aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.BR_HYBRID,
-                                            Duration.ofMillis (aSwBrHybrid.getMillis ()),
-                                            aBrHybridFindings));
+        aSpanBr.setAttribute ("kaltblut.findings.count", aBrHybridFindings.size ());
+        aSpanBr.setStatusOk ();
+      }
+      aSwBrHybrid.stop ();
+      aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.BR_HYBRID,
+                                              Duration.ofMillis (aSwBrHybrid.getMillis ()),
+                                              aBrHybridFindings));
 
-    // Layer 2: PDF/A-3 (optional)
-    if (m_aSettings.isCheckPdfA3 ())
-    {
-      final StopWatch aSwPdfA = StopWatch.createdStarted ();
-      ICommonsList <HybridFinding> aPdfAFindings = _runPdfA3 (aSource);
-      // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
-      if (m_aSettings.isApplyDePdfADowngrade () &&
+      // Layer 2: PDF/A-3 (optional)
+      if (m_aSettings.isCheckPdfA3 ())
+      {
+        final StopWatch aSwPdfA = StopWatch.createdStarted ();
+        ICommonsList <HybridFinding> aPdfAFindings = _runPdfA3 (aSource);
+        // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
+        if (m_aSettings.isApplyDePdfADowngrade () &&
           m_aSettings.getCountry () == EZugferdCountry.DE &&
           bXmlExtractable &&
           aPdfAFindings != null &&
           !aPdfAFindings.isEmpty ())
-      {
-        final ICommonsList <HybridFinding> aDowngraded = new CommonsArrayList <> ();
-        for (final HybridFinding aF : aPdfAFindings)
-          aDowngraded.add (aF.getSeverity () == EHybridSeverity.ERROR ? aF.withSeverity (EHybridSeverity.WARNING) : aF);
-        aPdfAFindings = aDowngraded;
+        {
+          final ICommonsList <HybridFinding> aDowngraded = new CommonsArrayList <> ();
+          for (final HybridFinding aF : aPdfAFindings)
+            aDowngraded.add (aF.getSeverity () == EHybridSeverity.ERROR ? aF.withSeverity (EHybridSeverity.WARNING)
+                                                                        : aF);
+          aPdfAFindings = aDowngraded;
+        }
+        aSwPdfA.stop ();
+        aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.PDF_A3,
+                                                Duration.ofMillis (aSwPdfA.getMillis ()),
+                                                aPdfAFindings));
       }
-      aSwPdfA.stop ();
-      aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.PDF_A3,
-                                              Duration.ofMillis (aSwPdfA.getMillis ()),
-                                              aPdfAFindings));
-    }
 
-    return new HybridValidationResult (aLayers);
+      final HybridValidationResult aResult = new HybridValidationResult (aLayers);
+
+      aSpanValidate.setAttribute ("kaltblut.findings.total", aResult.getFindingCount ());
+      aSpanValidate.setStatusOk ();
+      return aResult;
+    });
   }
 
   // ===================== BR-HYBRID rules =====================
@@ -393,9 +416,9 @@ public final class HybridValidator
   {
     // Code list values per the spec versions covered. We accept ZUGFeRD 1.0's mixed case too.
     return FN_FACTUR_X.equals (sName) ||
-           FN_XRECHNUNG.equals (sName) ||
-           FN_ZUGFERD_LOWER.equals (sName) ||
-           FN_ZUGFERD_MIXED.equals (sName);
+      FN_XRECHNUNG.equals (sName) ||
+      FN_ZUGFERD_LOWER.equals (sName) ||
+      FN_ZUGFERD_MIXED.equals (sName);
   }
 
   // ---------------- PDF/A-3 SPI ----------------

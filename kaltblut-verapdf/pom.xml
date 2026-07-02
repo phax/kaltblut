@@ -58,6 +58,11 @@
       <groupId>com.helger.kaltblut</groupId>
       <artifactId>kaltblut-core</artifactId>
     </dependency>
+    <!-- Telemetry facade for instrumenting the (heavy) veraPDF validation path. -->
+    <dependency>
+      <groupId>com.helger.telemetry</groupId>
+      <artifactId>ph-telemetry</artifactId>
+    </dependency>
     <!--
       Use the "-jakarta" artifact line published by veraPDF, which uses the modern jakarta.xml.bind
       API (JAXB 4.x). This pairs with the jaxb-runtime version managed by the ph-commons BOM and

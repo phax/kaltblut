@@ -64,6 +64,8 @@ import com.helger.kaltblut.core.model.HybridAttachment;
 import com.helger.kaltblut.core.model.HybridMetadata;
 import com.helger.kaltblut.core.source.HybridLimits;
 import com.helger.kaltblut.core.source.IHybridSource;
+import com.helger.telemetry.ETelemetrySpanKind;
+import com.helger.telemetry.Telemetry;
 import com.helger.xml.serialize.read.DOMReader;
 
 /**
@@ -138,8 +140,31 @@ public final class HybridDocument implements AutoCloseable
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");
-    final byte [] aBytes = aSource.getBytes (aLimits.getMaxPdfBytes ());
-    final PDDocument aDoc = Loader.loadPDF (aBytes);
+
+    // Span: reading the raw PDF bytes from the source (may be a network/file hop -> CLIENT).
+    final byte [] aBytes = Telemetry.<byte [], IOException> withSpanThrowing ("kaltblut.source.read",
+                                                                              ETelemetrySpanKind.CLIENT,
+                                                                              aSpan -> {
+                                                                                if (aSource.getName () != null)
+                                                                                  aSpan.setAttribute ("kaltblut.source.name",
+                                                                                                      aSource.getName ());
+                                                                                final byte [] a = aSource.getBytes (aLimits.getMaxPdfBytes ());
+                                                                                aSpan.setAttribute ("kaltblut.source.size_bytes",
+                                                                                                    a.length);
+                                                                                aSpan.setStatusOk ();
+                                                                                return a;
+                                                                              });
+
+    // Span: PDFBox parse of the byte array (CPU + memory heavy).
+    final PDDocument aDoc = Telemetry.<PDDocument, IOException> withSpanThrowing ("kaltblut.pdf.open",
+                                                                                  ETelemetrySpanKind.INTERNAL,
+                                                                                  aSpan -> {
+                                                                                    aSpan.setAttribute ("kaltblut.pdf.size_bytes",
+                                                                                                        aBytes.length);
+                                                                                    final PDDocument d = Loader.loadPDF (aBytes);
+                                                                                    aSpan.setStatusOk ();
+                                                                                    return d;
+                                                                                  });
     return new HybridDocument (aDoc, aSource, aLimits);
   }
 
@@ -261,64 +286,74 @@ public final class HybridDocument implements AutoCloseable
   @NonNull
   private HybridMetadata _doReadMetadata () throws IOException
   {
-    final PDDocumentCatalog aCatalog = m_aDoc.getDocumentCatalog ();
+    return Telemetry.withSpanThrowing ("kaltblut.xmp.parse", ETelemetrySpanKind.INTERNAL, aSpan -> {
+      final PDDocumentCatalog aCatalog = m_aDoc.getDocumentCatalog ();
 
-    // ----- XMP -----
-    String sNamespaceURI = null;
-    EZugferdFlavor eFlavor = null;
-    final ICommonsMap <String, String> aXmpFields = new CommonsHashMap <> ();
-    final PDMetadata aMetadata = aCatalog.getMetadata ();
-    if (aMetadata != null)
-    {
-      final byte [] aXmpBytes = StreamHelper.getAllBytes (aMetadata.createInputStream ());
-      if (aXmpBytes != null && aXmpBytes.length > 0)
+      // ----- XMP -----
+      String sNamespaceURI = null;
+      EZugferdFlavor eFlavor = null;
+      final ICommonsMap <String, String> aXmpFields = new CommonsHashMap <> ();
+      final PDMetadata aMetadata = aCatalog.getMetadata ();
+      if (aMetadata != null)
       {
-        final Document aXmpDoc = DOMReader.readXMLDOM (aXmpBytes);
-        if (aXmpDoc != null)
+        final byte [] aXmpBytes = StreamHelper.getAllBytes (aMetadata.createInputStream ());
+        if (aXmpBytes != null && aXmpBytes.length > 0)
         {
-          // Scan every element + attribute for a namespace we recognise.
-          final ScanResult aRes = _scanXmpForFlavor (aXmpDoc);
-          if (aRes != null)
+          final Document aXmpDoc = DOMReader.readXMLDOM (aXmpBytes);
+          if (aXmpDoc != null)
           {
-            sNamespaceURI = aRes.m_sNamespaceURI;
-            eFlavor = EZugferdFlavor.getFromNamespaceURIOrNull (sNamespaceURI);
-            aXmpFields.putAll (aRes.m_aFields);
+            // Scan every element + attribute for a namespace we recognise.
+            final ScanResult aRes = _scanXmpForFlavor (aXmpDoc);
+            if (aRes != null)
+            {
+              sNamespaceURI = aRes.m_sNamespaceURI;
+              eFlavor = EZugferdFlavor.getFromNamespaceURIOrNull (sNamespaceURI);
+              aXmpFields.putAll (aRes.m_aFields);
+            }
           }
+          else
+            LOGGER.warn ("Failed to parse XMP metadata as XML in PDF '" + m_aSource.getName () + "'");
         }
-        else
-          LOGGER.warn ("Failed to parse XMP metadata as XML in PDF '" + m_aSource.getName () + "'");
       }
-    }
 
-    final String sXmpDocumentType = aXmpFields.get (XMP_DOCUMENT_TYPE);
-    final String sXmpDocumentFileName = aXmpFields.get (XMP_DOCUMENT_FILE_NAME);
-    final String sXmpVersion = aXmpFields.get (XMP_VERSION);
-    final String sRawProfile = aXmpFields.get (XMP_CONFORMANCE_LEVEL);
-    final EZugferdProfile eProfile = EZugferdProfile.getFromIDOrNull (sRawProfile);
+      final String sXmpDocumentType = aXmpFields.get (XMP_DOCUMENT_TYPE);
+      final String sXmpDocumentFileName = aXmpFields.get (XMP_DOCUMENT_FILE_NAME);
+      final String sXmpVersion = aXmpFields.get (XMP_VERSION);
+      final String sRawProfile = aXmpFields.get (XMP_CONFORMANCE_LEVEL);
+      final EZugferdProfile eProfile = EZugferdProfile.getFromIDOrNull (sRawProfile);
 
-    // ----- Document-level /AF -----
-    String sEmbeddedFileName = null;
-    EAFRelationship eAFRelationship = null;
-    String sRawAFRelationship = null;
-    final PDComplexFileSpecification aInvoiceSpec = _findInvoiceFileSpec (aCatalog, sXmpDocumentFileName, eFlavor);
-    if (aInvoiceSpec != null)
-    {
-      sEmbeddedFileName = aInvoiceSpec.getFileUnicode () != null ? aInvoiceSpec.getFileUnicode () : aInvoiceSpec
-                                                                                                                .getFile ();
-      sRawAFRelationship = aInvoiceSpec.getCOSObject ().getNameAsString (COSNAME_AFRELATIONSHIP);
-      eAFRelationship = EAFRelationship.getFromIDOrNull (sRawAFRelationship);
-    }
+      // ----- Document-level /AF -----
+      String sEmbeddedFileName = null;
+      EAFRelationship eAFRelationship = null;
+      String sRawAFRelationship = null;
+      final PDComplexFileSpecification aInvoiceSpec = _findInvoiceFileSpec (aCatalog, sXmpDocumentFileName, eFlavor);
+      if (aInvoiceSpec != null)
+      {
+        sEmbeddedFileName = aInvoiceSpec.getFileUnicode () != null ? aInvoiceSpec.getFileUnicode ()
+                                                                   : aInvoiceSpec.getFile ();
+        sRawAFRelationship = aInvoiceSpec.getCOSObject ().getNameAsString (COSNAME_AFRELATIONSHIP);
+        eAFRelationship = EAFRelationship.getFromIDOrNull (sRawAFRelationship);
+      }
 
-    return new HybridMetadata (eFlavor,
-                               sNamespaceURI,
-                               sXmpDocumentType,
-                               sXmpDocumentFileName,
-                               sXmpVersion,
-                               eProfile,
-                               sRawProfile,
-                               sEmbeddedFileName,
-                               eAFRelationship,
-                               sRawAFRelationship);
+      final HybridMetadata aRet = new HybridMetadata (eFlavor,
+                                                      sNamespaceURI,
+                                                      sXmpDocumentType,
+                                                      sXmpDocumentFileName,
+                                                      sXmpVersion,
+                                                      eProfile,
+                                                      sRawProfile,
+                                                      sEmbeddedFileName,
+                                                      eAFRelationship,
+                                                      sRawAFRelationship);
+      if (eFlavor != null)
+        aSpan.setAttribute ("kaltblut.flavor", eFlavor.name ());
+      if (sNamespaceURI != null)
+        aSpan.setAttribute ("kaltblut.namespace.uri", sNamespaceURI);
+      if (eProfile != null)
+        aSpan.setAttribute ("kaltblut.profile", eProfile.getID ());
+      aSpan.setStatusOk ();
+      return aRet;
+    });
   }
 
   private static void _collectAllEmbeddedFilesRecursive (@NonNull final PDNameTreeNode <PDComplexFileSpecification> aNode,
@@ -390,67 +425,77 @@ public final class HybridDocument implements AutoCloseable
   @NonNull
   private ICommonsList <HybridAttachment> _doListAttachments () throws IOException
   {
-    final ICommonsList <HybridAttachment> ret = new CommonsArrayList <> ();
-    final HybridMetadata aMeta = readMetadata ();
-    final String sInvoiceName = aMeta.getEmbeddedFileName ();
+    return Telemetry.withSpanThrowing ("kaltblut.attachments.extract", ETelemetrySpanKind.INTERNAL, aSpan -> {
+      final ICommonsList <HybridAttachment> ret = new CommonsArrayList <> ();
+      final HybridMetadata aMeta = readMetadata ();
+      final String sInvoiceName = aMeta.getEmbeddedFileName ();
 
-    final PDDocumentCatalog aCatalog = m_aDoc.getDocumentCatalog ();
-    final PDDocumentNameDictionary aNames = aCatalog.getNames ();
-    if (aNames != null)
-    {
-      final PDEmbeddedFilesNameTreeNode aEFTree = aNames.getEmbeddedFiles ();
-      if (aEFTree != null)
+      final PDDocumentCatalog aCatalog = m_aDoc.getDocumentCatalog ();
+      final PDDocumentNameDictionary aNames = aCatalog.getNames ();
+      if (aNames != null)
       {
-        final ICommonsMap <String, PDComplexFileSpecification> aAll = _collectAllEmbeddedFiles (aEFTree);
-
-        final int nMaxCount = m_aLimits.getMaxAttachmentCount ();
-        if (nMaxCount >= 0 && aAll.size () > nMaxCount)
-          throw new IOException ("Embedded file count " + aAll.size () + " exceeds limit of " + nMaxCount);
-
-        final long nMaxPer = m_aLimits.getMaxAttachmentBytes ();
-        final long nMaxAggregate = m_aLimits.getMaxAggregateAttachmentBytes ();
-        long nAggregate = 0L;
-
-        for (final var aEntry : aAll.entrySet ())
+        final PDEmbeddedFilesNameTreeNode aEFTree = aNames.getEmbeddedFiles ();
+        if (aEFTree != null)
         {
-          final String sName = aEntry.getKey ();
-          final PDComplexFileSpecification aSpec = aEntry.getValue ();
-          final PDEmbeddedFile aEF = _pickEmbeddedFileStream (aSpec);
-          if (aEF == null)
-          {
-            LOGGER.warn ("Embedded file '" + sName + "' has no stream");
-            continue;
-          }
+          final ICommonsMap <String, PDComplexFileSpecification> aAll = _collectAllEmbeddedFiles (aEFTree);
 
-          final byte [] aBytes;
-          try (final InputStream aIS = aEF.createInputStream ())
-          {
-            aBytes = _readBounded (aIS, nMaxPer, "Embedded file '" + sName + "'");
-          }
+          final int nMaxCount = m_aLimits.getMaxAttachmentCount ();
+          if (nMaxCount >= 0 && aAll.size () > nMaxCount)
+            throw new IOException ("Embedded file count " + aAll.size () + " exceeds limit of " + nMaxCount);
 
-          if (nMaxAggregate >= 0)
-          {
-            nAggregate += aBytes.length;
-            if (nAggregate > nMaxAggregate)
-              throw new IOException ("Aggregate embedded-file size exceeded limit of " +
-                                     nMaxAggregate +
-                                     " bytes at attachment '" +
-                                     sName +
-                                     "'");
-          }
+          final long nMaxPer = m_aLimits.getMaxAttachmentBytes ();
+          final long nMaxAggregate = m_aLimits.getMaxAggregateAttachmentBytes ();
+          long nAggregate = 0L;
 
-          final String sMime = aEF.getSubtype ();
-          final String sRawRel = aSpec.getCOSObject ().getNameAsString (COSNAME_AFRELATIONSHIP);
-          final EAFRelationship eRel = EAFRelationship.getFromIDOrNull (sRawRel);
-          final Calendar aModCal = aEF.getModDate ();
-          final OffsetDateTime aModDate = aModCal == null ? null : OffsetDateTime.ofInstant (aModCal.toInstant (),
-                                                                                             ZoneOffset.UTC);
-          final boolean bIsInvoice = sInvoiceName != null && sInvoiceName.equals (sName);
-          ret.add (new HybridAttachment (sName, sMime, eRel, sRawRel, aModDate, aBytes, bIsInvoice));
+          for (final var aEntry : aAll.entrySet ())
+          {
+            final String sName = aEntry.getKey ();
+            final PDComplexFileSpecification aSpec = aEntry.getValue ();
+            final PDEmbeddedFile aEF = _pickEmbeddedFileStream (aSpec);
+            if (aEF == null)
+            {
+              LOGGER.warn ("Embedded file '" + sName + "' has no stream");
+              continue;
+            }
+
+            final byte [] aBytes;
+            try (final InputStream aIS = aEF.createInputStream ())
+            {
+              aBytes = _readBounded (aIS, nMaxPer, "Embedded file '" + sName + "'");
+            }
+
+            if (nMaxAggregate >= 0)
+            {
+              nAggregate += aBytes.length;
+              if (nAggregate > nMaxAggregate)
+                throw new IOException ("Aggregate embedded-file size exceeded limit of " +
+                                       nMaxAggregate +
+                                       " bytes at attachment '" +
+                                       sName +
+                                       "'");
+            }
+
+            final String sMime = aEF.getSubtype ();
+            final String sRawRel = aSpec.getCOSObject ().getNameAsString (COSNAME_AFRELATIONSHIP);
+            final EAFRelationship eRel = EAFRelationship.getFromIDOrNull (sRawRel);
+            final Calendar aModCal = aEF.getModDate ();
+            final OffsetDateTime aModDate = aModCal == null ? null
+                                                            : OffsetDateTime.ofInstant (aModCal.toInstant (),
+                                                                                        ZoneOffset.UTC);
+            final boolean bIsInvoice = sInvoiceName != null && sInvoiceName.equals (sName);
+            ret.add (new HybridAttachment (sName, sMime, eRel, sRawRel, aModDate, aBytes, bIsInvoice));
+          }
         }
       }
-    }
-    return ret;
+
+      long nAggBytes = 0L;
+      for (final HybridAttachment aAtt : ret)
+        nAggBytes += aAtt.getSize ();
+      aSpan.setAttribute ("kaltblut.attachment.count", ret.size ());
+      aSpan.setAttribute ("kaltblut.attachment.aggregate_bytes", nAggBytes);
+      aSpan.setStatusOk ();
+      return ret;
+    });
   }
 
   /**
@@ -487,9 +532,9 @@ public final class HybridDocument implements AutoCloseable
   private static boolean _isInterestingLocalName (@NonNull final String sLocalName)
   {
     return XMP_DOCUMENT_TYPE.equals (sLocalName) ||
-           XMP_DOCUMENT_FILE_NAME.equals (sLocalName) ||
-           XMP_VERSION.equals (sLocalName) ||
-           XMP_CONFORMANCE_LEVEL.equals (sLocalName);
+      XMP_DOCUMENT_FILE_NAME.equals (sLocalName) ||
+      XMP_VERSION.equals (sLocalName) ||
+      XMP_CONFORMANCE_LEVEL.equals (sLocalName);
   }
 
   private static void _collectFieldsForNamespaceRecursive (@NonNull final Node aNode,
