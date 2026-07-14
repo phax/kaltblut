@@ -22,7 +22,7 @@
   <parent>
     <groupId>com.helger</groupId>
     <artifactId>parent-pom</artifactId>
-    <version>3.0.5</version>
+    <version>3.1.0</version>
   </parent>
   <groupId>com.helger.kaltblut</groupId>
   <artifactId>kaltblut-parent-pom</artifactId>
@@ -63,11 +63,11 @@
   </developers>
 
   <properties>
-    <pdfbox.version>3.0.7</pdfbox.version>
+    <pdfbox.version>3.0.8</pdfbox.version>
     <picocli.version>4.7.7</picocli.version>
     <verapdf.version>1.30.2</verapdf.version>
     <ph-telemetry.version>1.0.1</ph-telemetry.version>
-    <opentelemetry.version>1.63.0</opentelemetry.version>
+    <opentelemetry.version>1.64.0</opentelemetry.version>
     <okhttp.version>5.4.0</okhttp.version>
   </properties>
 
