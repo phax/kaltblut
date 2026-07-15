@@ -63,19 +63,25 @@ public final class InspectCommand implements Callable <Integer>
       {
         final IHybridSource aSource = HybridSource.fromFile (aFile);
         final HybridMetadata aMeta = HybridInspector.readMetadata (aSource);
+        // Values marked below flow from attacker-controlled XMP / embedded-file metadata and are
+        // sanitized before printing to prevent terminal escape / line injection.
         System.out.println ("File:                " + aFile.getName ());
         System.out.println ("  Recognised hybrid:  " + aMeta.isRecognisedHybridInvoice ());
         System.out.println ("  Flavor:             " + aMeta.getFlavor ());
-        System.out.println ("  Namespace URI:      " + aMeta.getNamespaceURI ());
-        System.out.println ("  XMP DocumentType:   " + aMeta.getXmpDocumentType ());
-        System.out.println ("  XMP DocFileName:    " + aMeta.getXmpDocumentFileName ());
-        System.out.println ("  XMP Version:        " + aMeta.getXmpVersion ());
-        System.out.println ("  Profile:            " + aMeta.getProfile () + " (raw: " + aMeta.getRawProfile () + ")");
-        System.out.println ("  Embedded file:      " + aMeta.getEmbeddedFileName ());
+        System.out.println ("  Namespace URI:      " + CLIStringHelper.getConsoleSafe (aMeta.getNamespaceURI ()));
+        System.out.println ("  XMP DocumentType:   " + CLIStringHelper.getConsoleSafe (aMeta.getXmpDocumentType ()));
+        System.out.println ("  XMP DocFileName:    " + CLIStringHelper.getConsoleSafe (aMeta.getXmpDocumentFileName ()));
+        System.out.println ("  XMP Version:        " + CLIStringHelper.getConsoleSafe (aMeta.getXmpVersion ()));
+        System.out.println ("  Profile:            " +
+                            aMeta.getProfile () +
+                            " (raw: " +
+                            CLIStringHelper.getConsoleSafe (aMeta.getRawProfile ()) +
+                            ")");
+        System.out.println ("  Embedded file:      " + CLIStringHelper.getConsoleSafe (aMeta.getEmbeddedFileName ()));
         System.out.println ("  /AFRelationship:    " +
                             aMeta.getAFRelationship () +
                             " (raw: " +
-                            aMeta.getRawAFRelationship () +
+                            CLIStringHelper.getConsoleSafe (aMeta.getRawAFRelationship ()) +
                             ")");
       }
       catch (final Exception ex)

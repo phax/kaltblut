@@ -99,7 +99,9 @@ public final class ValidateCommand implements Callable <Integer>
                               "ms");
           for (final HybridFinding aF : aLayer.getAllFindings ())
           {
-            System.out.println ("    " + aF);
+            // A finding's message / location can embed attacker-controlled PDF strings; sanitize
+            // before printing to prevent terminal escape / line injection.
+            System.out.println ("    " + CLIStringHelper.getConsoleSafe (aF.toString ()));
             switch (aF.getSeverity ())
             {
               case ERROR -> nError++;

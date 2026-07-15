@@ -18,6 +18,8 @@ package com.helger.kaltblut.cli;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -121,7 +123,15 @@ public final class ExtractCommand implements Callable <Integer>
         if (nDot > 0)
           sBaseName = sBaseName.substring (0, nDot);
         final File aOutFile = new File (aOutDir, sBaseName + m_sSuffix + ".xml");
-        Files.write (aOutFile.toPath (), aXml);
+        // NOFOLLOW_LINKS: refuse to write through a pre-planted symlink at the target path (e.g.
+        // in a shared/world-writable output directory), which would otherwise let an attacker
+        // redirect the write to an arbitrary file the running user can modify.
+        Files.write (aOutFile.toPath (),
+                     aXml,
+                     StandardOpenOption.CREATE,
+                     StandardOpenOption.WRITE,
+                     StandardOpenOption.TRUNCATE_EXISTING,
+                     LinkOption.NOFOLLOW_LINKS);
         LOGGER.info ("Extracted " + aXml.length + " bytes to '" + aOutFile.getName () + "'");
         nSuccess++;
       }

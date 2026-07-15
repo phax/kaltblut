@@ -21,7 +21,6 @@ import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Calendar;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.pdfbox.Loader;
@@ -48,6 +47,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import com.helger.annotation.CheckForSigned;
 import com.helger.annotation.WillClose;
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.enforce.ValueEnforcer;
@@ -89,6 +89,13 @@ public final class HybridDocument implements AutoCloseable
   /** PDF/A "Associated File" keys. */
   private static final COSName COSNAME_AF = COSName.getPDFName ("AF");
   private static final COSName COSNAME_AFRELATIONSHIP = COSName.getPDFName ("AFRelationship");
+
+  /**
+   * Maximum recursion depth for the embedded-files name tree. A malicious PDF whose name-tree nodes
+   * reference each other cyclically (or nest absurdly deeply) would otherwise cause a
+   * {@link StackOverflowError}; this bound converts that into a clean {@link IOException}.
+   */
+  private static final int MAX_NAME_TREE_DEPTH = 100;
 
   private static final Logger LOGGER = LoggerFactory.getLogger (HybridDocument.class);
 
@@ -258,6 +265,25 @@ public final class HybridDocument implements AutoCloseable
   }
 
   /**
+   * Replace ISO control characters (CR, LF, ESC, ...) with '?' so that attacker-controlled strings
+   * from the PDF (embedded-file names, source names) cannot forge or corrupt log lines.
+   */
+  @Nullable
+  private static String _sanitizeForLog (@Nullable final String s)
+  {
+    if (s == null)
+      return null;
+
+    final StringBuilder aSB = new StringBuilder (s.length ());
+    for (int i = 0; i < s.length (); i++)
+    {
+      final char c = s.charAt (i);
+      aSB.append (Character.isISOControl (c) ? '?' : c);
+    }
+    return aSB.toString ();
+  }
+
+  /**
    * Scan an XMP DOM for any element or attribute in one of the known flavor namespaces. Collects
    * the four expected local names from elements and attributes alike (both forms appear in the
    * spec: element form and attribute form).
@@ -296,8 +322,15 @@ public final class HybridDocument implements AutoCloseable
       final PDMetadata aMetadata = aCatalog.getMetadata ();
       if (aMetadata != null)
       {
-        final byte [] aXmpBytes = StreamHelper.getAllBytes (aMetadata.createInputStream ());
-        if (aXmpBytes != null && aXmpBytes.length > 0)
+        // Bound the decoded XMP stream: PDMetadata.createInputStream applies the PDF stream
+        // filters (e.g. FlateDecode), so an unbounded read here is a decompression-bomb vector
+        // that would bypass the maxPdfBytes ceiling. Cap it at the PDF-size limit.
+        final byte [] aXmpBytes;
+        try (final InputStream aXmpIS = aMetadata.createInputStream ())
+        {
+          aXmpBytes = _readBounded (aXmpIS, m_aLimits.getMaxPdfBytes (), "XMP metadata");
+        }
+        if (aXmpBytes.length > 0)
         {
           final Document aXmpDoc = DOMReader.readXMLDOM (aXmpBytes);
           if (aXmpDoc != null)
@@ -312,7 +345,7 @@ public final class HybridDocument implements AutoCloseable
             }
           }
           else
-            LOGGER.warn ("Failed to parse XMP metadata as XML in PDF '" + m_aSource.getName () + "'");
+            LOGGER.warn ("Failed to parse XMP metadata as XML in PDF '" + _sanitizeForLog (m_aSource.getName ()) + "'");
         }
       }
 
@@ -356,23 +389,28 @@ public final class HybridDocument implements AutoCloseable
     });
   }
 
-  private static void _collectAllEmbeddedFilesRecursive (@NonNull final PDNameTreeNode <PDComplexFileSpecification> aNode,
-                                                         @NonNull final ICommonsMap <String, PDComplexFileSpecification> aOut) throws IOException
+  private static void _recursiveCollectAllEmbeddedFilesRecursive (@NonNull final PDNameTreeNode <PDComplexFileSpecification> aNode,
+                                                                  @NonNull final ICommonsMap <String, PDComplexFileSpecification> aOut,
+                                                                  final int nDepth) throws IOException
   {
-    final Map <String, PDComplexFileSpecification> aDirect = aNode.getNames ();
+    if (nDepth > MAX_NAME_TREE_DEPTH)
+      throw new IOException ("Embedded-files name tree exceeds the maximum depth of " + MAX_NAME_TREE_DEPTH);
+
+    final var aDirect = aNode.getNames ();
     if (aDirect != null)
       aOut.putAll (aDirect);
-    final List <PDNameTreeNode <PDComplexFileSpecification>> aKids = aNode.getKids ();
+
+    final var aKids = aNode.getKids ();
     if (aKids != null)
-      for (final PDNameTreeNode <PDComplexFileSpecification> aKid : aKids)
-        _collectAllEmbeddedFilesRecursive (aKid, aOut);
+      for (final var aKid : aKids)
+        _recursiveCollectAllEmbeddedFilesRecursive (aKid, aOut, nDepth + 1);
   }
 
   @NonNull
   private static ICommonsMap <String, PDComplexFileSpecification> _collectAllEmbeddedFiles (@NonNull final PDEmbeddedFilesNameTreeNode aNode) throws IOException
   {
     final ICommonsMap <String, PDComplexFileSpecification> aResult = new CommonsHashMap <> ();
-    _collectAllEmbeddedFilesRecursive (aNode, aResult);
+    _recursiveCollectAllEmbeddedFilesRecursive (aNode, aResult, 0);
     return aResult;
   }
 
@@ -398,7 +436,7 @@ public final class HybridDocument implements AutoCloseable
    */
   @NonNull
   private static byte [] _readBounded (@NonNull final InputStream aIS,
-                                       final long nMaxBytes,
+                                       @CheckForSigned final long nMaxBytes,
                                        @NonNull final String sWhat) throws IOException
   {
     if (nMaxBytes < 0)
@@ -406,6 +444,7 @@ public final class HybridDocument implements AutoCloseable
       final byte [] aAll = StreamHelper.getAllBytes (aIS);
       return aAll != null ? aAll : new byte [0];
     }
+
     try (final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
     {
       final byte [] aBuf = new byte [8192];
@@ -454,7 +493,7 @@ public final class HybridDocument implements AutoCloseable
             final PDEmbeddedFile aEF = _pickEmbeddedFileStream (aSpec);
             if (aEF == null)
             {
-              LOGGER.warn ("Embedded file '" + sName + "' has no stream");
+              LOGGER.warn ("Embedded file '" + _sanitizeForLog (sName) + "' has no stream");
               continue;
             }
 
@@ -468,11 +507,13 @@ public final class HybridDocument implements AutoCloseable
             {
               nAggregate += aBytes.length;
               if (nAggregate > nMaxAggregate)
+              {
                 throw new IOException ("Aggregate embedded-file size exceeded limit of " +
                                        nMaxAggregate +
                                        " bytes at attachment '" +
                                        sName +
                                        "'");
+              }
             }
 
             final String sMime = aEF.getSubtype ();

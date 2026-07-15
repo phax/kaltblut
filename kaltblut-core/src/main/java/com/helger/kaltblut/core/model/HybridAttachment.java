@@ -59,7 +59,9 @@ public final class HybridAttachment
     m_eAFRelationship = eAFRelationship;
     m_sRawAFRelationship = sRawAFRelationship;
     m_aModDate = aModDate;
-    m_aBytes = aBytes;
+    // Defensive copy: this is an @Immutable value object, so the payload must not be aliased to a
+    // caller-held array that could be mutated after the attachment was classified.
+    m_aBytes = Arrays.copyOf (aBytes, aBytes.length);
     m_bIsInvoiceXml = bIsInvoiceXml;
   }
 

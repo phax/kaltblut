@@ -170,9 +170,18 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
       {
         LOGGER.warn ("veraPDF validation failed", ex);
         aSpan.recordException (ex).setStatusError (ex.getMessage ());
+
+        // Fail closed: a crash while validating an untrusted PDF must not let the document be
+        // reported as valid. Emit an ERROR so isValid()/hasError() reflect that PDF/A-3
+        // conformance could NOT be confirmed. Only the throwable class name is included to avoid
+        // leaking internal offsets / temp-file paths from the raw message.
         aOut.add (new HybridFinding ("VERAPDF-ERROR",
-                                     EHybridSeverity.WARNING,
-                                     "veraPDF validation failed: " + ex.getMessage (),
+                                     EHybridSeverity.ERROR,
+                                     "veraPDF validation could not be completed (" +
+                                                            ex.getClass ().getName () +
+                                                            ": " +
+                                                            ex.getMessage () +
+                                                            "); PDF/A-3 conformance was not confirmed.",
                                      null));
       }
     }

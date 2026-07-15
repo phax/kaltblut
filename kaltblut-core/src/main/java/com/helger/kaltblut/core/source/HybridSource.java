@@ -161,9 +161,14 @@ public final class HybridSource
    * <p>
    * Only the <code>http</code> and <code>https</code> schemes are accepted; other schemes
    * (<code>file:</code>, <code>jar:</code>, <code>ftp:</code>, ...) are rejected to prevent
-   * accidental SSRF / local-file-read when a caller forwards untrusted URLs. Connect and read
-   * timeouts default to {@link #DEFAULT_URL_CONNECT_TIMEOUT} and {@link #DEFAULT_URL_READ_TIMEOUT}
-   * respectively; use {@link #fromUrl(URL, Duration, Duration)} to override.
+   * local-file / classpath reads via a non-network scheme. This is a scheme check only: it does
+   * <b>not</b> constrain the target host, and HTTP redirects are followed without re-validation, so
+   * it does <b>not</b> by itself prevent server-side request forgery (SSRF) against internal hosts
+   * (e.g. <code>http://169.254.169.254/</code>, <code>localhost</code>). When forwarding untrusted
+   * URLs, the caller is responsible for host / IP allow-listing and redirect policy. Connect and
+   * read timeouts default to {@link #DEFAULT_URL_CONNECT_TIMEOUT} and
+   * {@link #DEFAULT_URL_READ_TIMEOUT} respectively; use {@link #fromUrl(URL, Duration, Duration)} to
+   * override.
    *
    * @param aUrl
    *        the URL. May not be <code>null</code>; scheme must be <code>http</code> or

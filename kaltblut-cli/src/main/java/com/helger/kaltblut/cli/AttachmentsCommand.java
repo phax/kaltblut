@@ -63,13 +63,15 @@ public final class AttachmentsCommand implements Callable <Integer>
         final IHybridSource aSource = HybridSource.fromFile (aFile);
         final List <HybridAttachment> aAtts = HybridExtractor.listAttachments (aSource);
         System.out.println ("File: " + aFile.getName () + " (" + aAtts.size () + " attachment(s))");
+        // Attachment name, MIME type and AFRelationship come from the untrusted PDF; sanitize
+        // them before printing to prevent terminal escape / line injection.
         for (final HybridAttachment aAtt : aAtts)
           System.out.println ("  - " +
-                              aAtt.getName () +
+                              CLIStringHelper.getConsoleSafe (aAtt.getName ()) +
                               "  [" +
-                              (aAtt.getMimeType () == null ? "?" : aAtt.getMimeType ()) +
+                              (aAtt.getMimeType () == null ? "?" : CLIStringHelper.getConsoleSafe (aAtt.getMimeType ())) +
                               "]  AFRel=" +
-                              aAtt.getRawAFRelationship () +
+                              CLIStringHelper.getConsoleSafe (aAtt.getRawAFRelationship ()) +
                               "  size=" +
                               aAtt.getSize () +
                               (aAtt.isInvoiceXml () ? "  (invoice XML)" : ""));
