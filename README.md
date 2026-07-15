@@ -340,6 +340,27 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
+v0.9.4 - 2026-07-15
+* Security hardening of the untrusted-PDF parsing paths:
+  * The XMP `/Metadata` stream is now read through the bounded reader and capped at
+    `HybridLimits.getMaxPdfBytes()`, closing a decompression-bomb vector that previously bypassed
+    the PDF-size limit.
+  * The embedded-files name tree is traversed with a maximum recursion depth, so a cyclic or
+    deeply nested tree raises a clean `IOException` instead of a `StackOverflowError`.
+  * **Behaviour change**: when veraPDF throws while validating an untrusted PDF, the PDF/A-3 layer
+    now emits an `ERROR` (fail-closed) instead of a `WARNING`, so such a document is reported as
+    invalid rather than valid; the finding no longer echoes the raw exception message.
+  * `HybridAttachment` now defensively copies the payload in its constructor, matching the
+    `@Immutable` contract already honoured by `getBytes()`.
+  * Attacker-controlled strings (embedded-file names, XMP values) are stripped of control
+    characters before being written to logs and to the CLI console, preventing log / terminal
+    escape-sequence injection.
+  * The CLI `extract` subcommand writes the output XML with `NOFOLLOW_LINKS`, refusing to write
+    through a pre-planted symlink in the output directory.
+  * Clarified the `HybridSource.fromUrl` Javadoc: the scheme check does not prevent host-level
+    SSRF or re-validate HTTP redirects — host / IP allow-listing remains the caller's
+    responsibility.
+
 v0.9.3 - 2026-07-02
 * Added distributed-tracing instrumentation via the vendor-neutral
   [ph-telemetry](https://github.com/phax/ph-telemetry) facade. `kaltblut-core` and
