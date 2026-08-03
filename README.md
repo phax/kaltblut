@@ -398,3 +398,8 @@ v0.9.0 - 2026-05-13
   variants) plus PDF/A-3 conformance via the `IPdfA3ValidatorSPI` SPI implemented by
   `kaltblut-verapdf` using veraPDF (`-jakarta` artifact line, JAXB 4.x only).
 * Command-line client with subcommands `inspect`, `extract`, `attachments`, `validate`.
+
+---
+
+My personal [Coding Styleguide](https://github.com/phax/meta/blob/master/CodingStyleguide.md) |
+It is appreciated if you star the GitHub project if you like it.
