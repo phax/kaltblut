@@ -35,22 +35,23 @@ Empty cells (`—`) mean "not specified in that version's documents", not
 | 2.3.3   | 1.07.3        | 2025-05-15   | [2.3.3.md](2.3.3.md)                | Code-list refresh; BR-HYBRID table rendered as image in PDF (text unchanged) |
 | 2.4     | 1.08          | 2025-12-04   | [2.4.md](2.4.md)                    | Code-list refresh; carrier rules unchanged vs 2.3.2 / 2.3.3   |
 | 2.5     | 1.09          | 2026-06-10   | [2.5.md](2.5.md)                    | XML-side update (new EXTENDED BTs anticipating Revised EN 16931 2026); carrier-side Δ: attachment whitelist gains `XLS` |
+| 2.5.2   | 1.09.2        | 2026-08-04   | [2.5.2.md](2.5.2.md)                | XML-side Schematron maintenance; carrier-side Δ: new BR-FX-DE-04 (Warning, DE) in the HYBRID appendix. (1.09.1, 2026-06-11, was an EXTENDED-Schematron delivery hotfix without a republished spec document.) |
 
 ---
 
 ## 2. Carrier format
 
-| Item                                  | 1.0                  | 2.0.1                | 2.1                | 2.2                 | 2.3                 | 2.3.2               | 2.3.3               | 2.4                 | 2.5                 |
-| ------------------------------------- | -------------------- | -------------------- | ------------------ | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- |
-| PDF/A-3 mandatory                     | yes                  | yes                  | yes                | yes                 | yes                 | yes                 | yes                 | yes                 | yes                 |
-| PDF/A-4f also accepted                | no                   | no                   | no                 | yes (option)        | yes (option)        | yes (option)        | yes (option)        | yes (option)        | yes (option)        |
-| Conformance levels 3a/3b/3u accepted  | yes (any)            | yes (any)            | yes (any)          | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended |
-| PDF filename convention               | none                 | none                 | none               | none                | none                | none                | none                | none                | none                |
-| PDF/A-3 image whitelist stated in prose | yes (CCITT/JBIG2/JPEG/JP2K) | not explicit | not explicit | yes (CCITT/JBIG2/JPEG/JP2K) | yes | yes | yes | yes | yes |
+| Item                                  | 1.0                  | 2.0.1                | 2.1                | 2.2                 | 2.3                 | 2.3.2               | 2.3.3               | 2.4                 | 2.5                 | 2.5.2               |
+| ------------------------------------- | -------------------- | -------------------- | ------------------ | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- | ------------------- |
+| PDF/A-3 mandatory                     | yes                  | yes                  | yes                | yes                 | yes                 | yes                 | yes                 | yes                 | yes                 | yes                 |
+| PDF/A-4f also accepted                | no                   | no                   | no                 | yes (option)        | yes (option)        | yes (option)        | yes (option)        | yes (option)        | yes (option)        | yes (option)        |
+| Conformance levels 3a/3b/3u accepted  | yes (any)            | yes (any)            | yes (any)          | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended | yes; 3a recommended |
+| PDF filename convention               | none                 | none                 | none               | none                | none                | none                | none                | none                | none                | none                |
+| PDF/A-3 image whitelist stated in prose | yes (CCITT/JBIG2/JPEG/JP2K) | not explicit | not explicit | yes (CCITT/JBIG2/JPEG/JP2K) | yes | yes | yes | yes | yes | yes |
 
 ## 3. Embedded structured invoice file — naming
 
-| Item                                  | 1.0                       | 2.0.1                  | 2.1                                                      | 2.2 → 2.5                                                  |
+| Item                                  | 1.0                       | 2.0.1                  | 2.1                                                      | 2.2 → 2.5.2                                                |
 | ------------------------------------- | ------------------------- | ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------- |
 | Default file name                     | `ZUGFeRD-invoice.xml`     | `zugferd-invoice.xml`  | `factur-x.xml` (primary) or `zugferd-invoice.xml` (legacy) | `factur-x.xml`                                             |
 | XRECHNUNG reference profile name      | n/a                       | n/a                    | n/a (profile not yet introduced)                         | `xrechnung.xml` (when XRECHNUNG profile is used)           |
@@ -58,15 +59,15 @@ Empty cells (`—`) mean "not specified in that version's documents", not
 
 ## 4. File specification dictionary / embedding
 
-| Item                                                  | 1.0  | 2.0.1 | 2.1   | 2.2  | 2.3  | 2.3.2 | 2.3.3 | 2.4  | 2.5  |
-| ----------------------------------------------------- | ---- | ----- | ----- | ---- | ---- | ----- | ----- | ---- | ---- |
-| `/Params` recommended                                 | yes  | yes   | yes (conditional) | yes  | yes  | yes   | yes   | yes  | yes  |
-| `/ModDate` required inside `/Params`                  | yes  | yes   | yes   | yes  | yes  | yes   | yes   | yes  | yes  |
-| Empty `/Params` allowed                               | —    | no    | no    | no   | no   | no    | no    | no   | no   |
-| Listed in `/Names → /EmbeddedFiles`                   | yes  | yes   | yes   | yes  | yes  | yes   | yes   | yes  | yes  |
-| `/Kids` tree levels under `/EmbeddedFiles` permitted  | yes  | yes   | yes   | yes  | yes  | yes   | yes   | yes  | yes  |
-| `/AF` array on Document Catalogue (Root)              | yes  | yes   | yes   | yes  | yes  | yes   | yes   | yes  | yes  |
-| Embedded XML relation level                           | document | document | document | document | document | document | document | document | document |
+| Item                                                  | 1.0  | 2.0.1 | 2.1   | 2.2  | 2.3  | 2.3.2 | 2.3.3 | 2.4  | 2.5  | 2.5.2 |
+| ----------------------------------------------------- | ---- | ----- | ----- | ---- | ---- | ----- | ----- | ---- | ---- | ----- |
+| `/Params` recommended                                 | yes  | yes   | yes (conditional) | yes  | yes  | yes   | yes   | yes  | yes  | yes   |
+| `/ModDate` required inside `/Params`                  | yes  | yes   | yes   | yes  | yes  | yes   | yes   | yes  | yes  | yes   |
+| Empty `/Params` allowed                               | —    | no    | no    | no   | no   | no    | no    | no   | no   | no    |
+| Listed in `/Names → /EmbeddedFiles`                   | yes  | yes   | yes   | yes  | yes  | yes   | yes   | yes  | yes  | yes   |
+| `/Kids` tree levels under `/EmbeddedFiles` permitted  | yes  | yes   | yes   | yes  | yes  | yes   | yes   | yes  | yes  | yes   |
+| `/AF` array on Document Catalogue (Root)              | yes  | yes   | yes   | yes  | yes  | yes   | yes   | yes  | yes  | yes   |
+| Embedded XML relation level                           | document | document | document | document | document | document | document | document | document | document |
 
 ## 5. AFRelationship matrix
 
@@ -74,14 +75,14 @@ Empty cells (`—`) mean "not specified in that version's documents", not
 in 2.1 (FR introduced via Factur-X). Earlier ZUGFeRD-only versions
 specify rules from the German tax perspective only.
 
-| Profile                | 1.0 | 2.0.1 | 2.1 FR | 2.1 DE | 2.2 FR     | 2.2 DE | 2.3 FR     | 2.3 DE | 2.3.2 FR   | 2.3.2 DE | 2.3.3 FR   | 2.3.3 DE | 2.4 FR     | 2.4 DE | 2.5 FR     | 2.5 DE |
-| ---------------------- | --- | ----- | ------ | ------ | ---------- | ------ | ---------- | ------ | ---------- | -------- | ---------- | -------- | ---------- | ------ | ---------- | ------ |
-| MINIMUM                | n/a | D     | D      | D      | D          | D      | D          | D      | D          | D        | D          | D        | D          | D      | D          | D      |
-| BASIC WL               | n/a | D     | D      | D      | D          | D      | D          | D      | D          | D        | D          | D        | D          | D      | D          | D      |
-| BASIC                  | A   | A     | S or D | A      | A or S or D| A      | A or S or D| A      | A or S or D| A        | A or S or D| A        | A or S or D| A      | A or S or D| A      |
-| COMFORT / EN 16931     | A   | A     | S or D | A      | A or S or D| A      | A or S or D| A      | A or S or D| A        | A or S or D| A        | A or S or D| A      | A or S or D| A      |
-| EXTENDED               | A   | A     | S or D | A      | A or S or D| A      | A or S or D| A      | A or S or D| A        | A or S or D| A        | A or S or D| A      | A or S or D| A      |
-| XRECHNUNG              | n/a | n/a   | n/a    | n/a    | n/a (FR)   | A      | n/a (FR)   | A      | n/a (FR)   | A        | n/a (FR)   | A        | n/a (FR)   | A      | n/a (FR)   | A      |
+| Profile                | 1.0 | 2.0.1 | 2.1 FR | 2.1 DE | 2.2 FR     | 2.2 DE | 2.3 FR     | 2.3 DE | 2.3.2 FR   | 2.3.2 DE | 2.3.3 FR   | 2.3.3 DE | 2.4 FR     | 2.4 DE | 2.5 FR     | 2.5 DE | 2.5.2 FR   | 2.5.2 DE |
+| ---------------------- | --- | ----- | ------ | ------ | ---------- | ------ | ---------- | ------ | ---------- | -------- | ---------- | -------- | ---------- | ------ | ---------- | ------ | ---------- | -------- |
+| MINIMUM                | n/a | D     | D      | D      | D          | D      | D          | D      | D          | D        | D          | D        | D          | D      | D          | D      | D          | D        |
+| BASIC WL               | n/a | D     | D      | D      | D          | D      | D          | D      | D          | D        | D          | D        | D          | D      | D          | D      | D          | D        |
+| BASIC                  | A   | A     | S or D | A      | A or S or D| A      | A or S or D| A      | A or S or D| A        | A or S or D| A        | A or S or D| A      | A or S or D| A      | A or S or D| A        |
+| COMFORT / EN 16931     | A   | A     | S or D | A      | A or S or D| A      | A or S or D| A      | A or S or D| A        | A or S or D| A        | A or S or D| A      | A or S or D| A      | A or S or D| A        |
+| EXTENDED               | A   | A     | S or D | A      | A or S or D| A      | A or S or D| A      | A or S or D| A        | A or S or D| A        | A or S or D| A      | A or S or D| A      | A or S or D| A        |
+| XRECHNUNG              | n/a | n/a   | n/a    | n/a    | n/a (FR)   | A      | n/a (FR)   | A      | n/a (FR)   | A        | n/a (FR)   | A        | n/a (FR)   | A      | n/a (FR)   | A      | n/a (FR)   | A        |
 
 Notes:
 
@@ -95,7 +96,7 @@ Notes:
 
 ## 6. PDF/A XMP extension schema (primary)
 
-| Item                                                | 1.0                                                       | 2.0.1                                                  | 2.1 (primary)                                          | 2.2 → 2.5                                              |
+| Item                                                | 1.0                                                       | 2.0.1                                                  | 2.1 (primary)                                          | 2.2 → 2.5.2                                            |
 | --------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ | ------------------------------------------------------ |
 | Schema name (table value)                           | `ZUGFeRD PDFA Extension Schema` (also `ZUGFeRD Schema` in XML comment) | `ZUGFeRD PDFA Extension Schema`                  | `ZUGFeRD PDFA Extension Schema` (worked example: `Factur-x PDFA Extension Schema`) | `Factur-X PDFA Extension Schema` (capitalisation varies)|
 | Namespace URI                                       | `urn:ferd:pdfa:CrossIndustryDocument:invoice:1p0#`        | `urn:zugferd:pdfa:CrossIndustryDocument:invoice:2p0#`  | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#` | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#` |
@@ -112,7 +113,7 @@ Notes:
 A "legacy" entry is one retained for backward compatibility with an
 older spec version. Files may carry one of the schema variants below.
 
-| Item                                                | 2.1 legacy (Supplement B)                              | 2.2 → 2.5 (legacy)                                     |
+| Item                                                | 2.1 legacy (Supplement B)                              | 2.2 → 2.5.2 (legacy)                                   |
 | --------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
 | Schema name                                         | `ZUGFeRD PDFA Extension Schema`                        | `ZUGFeRD PDF/A Extension Schema`                       |
 | Namespace URI                                       | `urn:zugferd:pdfa:CrossIndustryDocument:invoice:2p0#`  | `urn:zugferd:pdfa:CrossIndustryDocument:invoice:1p0#`  |
@@ -138,11 +139,11 @@ published.
 
 ## 9. Additional attachments (other than the invoice XML)
 
-| Item                                       | 1.0                                                              | 2.0.1                                                                                             | 2.1                                                                                                                         | 2.2                                                  | 2.3                                                | 2.3.2                                              | 2.3.3                                              | 2.4                                                | 2.5                                                     |
-| ------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
-| Allowed formats                            | PDF, TXT, GIF, TIFF, JPG, CSV, XML (receiver must handle these)  | Profile-dependent: BASIC/EN/BASIC WL/MIN: PDF, PNG, JPEG, CSV, XLSX, ODS. EXTENDED: any MIME      | Profile-dependent: BASIC/EN/MIN/BASIC WL: PDF, PNG, JPEG, CSV/Text, XLSX, ODS. EXTENDED: any valid MIME                     | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON             | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, XLSX, ODS | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, XLSX, ODS | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, XLSX, ODS | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, XLSX, ODS | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, **XLS**, XLSX, ODS |
-| Extra XMP metadata for non-invoice attachments | not required                                                  | not required                                                                                      | not required                                                                                                                | not required                                         | not required                                       | not required                                       | not required                                       | not required                                       | not required                                            |
-| Attachment referencing convention          | —                                                                | relative URL `#ef=<filename>` in `AdditionalReferencedDocument/URIID` (PDF fragment ID, RFC 8118) | relative URL `#ef=<filename>` (same)                                                                                        | reserved names: EDIFACT `factur-xedifact.edi`, UBL `factur-xubl.xml` | same as 2.2                                        | same as 2.2                                        | same as 2.2                                        | same as 2.2                                        | same as 2.2                                             |
+| Item                                       | 1.0                                                              | 2.0.1                                                                                             | 2.1                                                                                                                         | 2.2                                                  | 2.3                                                | 2.3.2                                              | 2.3.3                                              | 2.4                                                | 2.5                                                     | 2.5.2                                                   |
+| ------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------- |
+| Allowed formats                            | PDF, TXT, GIF, TIFF, JPG, CSV, XML (receiver must handle these)  | Profile-dependent: BASIC/EN/BASIC WL/MIN: PDF, PNG, JPEG, CSV, XLSX, ODS. EXTENDED: any MIME      | Profile-dependent: BASIC/EN/MIN/BASIC WL: PDF, PNG, JPEG, CSV/Text, XLSX, ODS. EXTENDED: any valid MIME                     | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON             | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, XLSX, ODS | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, XLSX, ODS | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, XLSX, ODS | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, XLSX, ODS | PDF, TXT, GIF, TIFF, JPG, CSV, XML, JSON, **XLS**, XLSX, ODS | same as 2.5                                             |
+| Extra XMP metadata for non-invoice attachments | not required                                                  | not required                                                                                      | not required                                                                                                                | not required                                         | not required                                       | not required                                       | not required                                       | not required                                       | not required                                            | not required                                            |
+| Attachment referencing convention          | —                                                                | relative URL `#ef=<filename>` in `AdditionalReferencedDocument/URIID` (PDF fragment ID, RFC 8118) | relative URL `#ef=<filename>` (same)                                                                                        | reserved names: EDIFACT `factur-xedifact.edi`, UBL `factur-xubl.xml` | same as 2.2                                        | same as 2.2                                        | same as 2.2                                        | same as 2.2                                        | same as 2.2                                             | same as 2.2                                             |
 
 ## 10. BR-HYBRID-* business rule block
 
@@ -171,17 +172,20 @@ Severity levels: `F` = Fatal, `W` = Warning, `I` = Info.
 | BR-FX-DE-01     | F        | DE         | 2.3.2                   | DE: supporting docs for place/time/kind SHALL be in BG-24 (no technical check).        |
 | BR-FX-DE-02     | F        | DE         | 2.3.2                   | DE: main services SHALL be detailed in the XML (no technical check).                   |
 | BR-FX-DE-03     | W        | DE↔DE      | 2.3.2                   | DE↔DE: from 2025-01-01 the XML is the invoice; PDF/A technical errors → Warning.       |
+| BR-FX-DE-04     | W        | DE         | 2.5.2 (Factur-X 1.09.2) | DE: non-down-payment invoices (type code ≠ 386) need BT-72, BG-14 or BG-26 per item; without BT-72 at least BT-80. XML-content rule, no carrier check possible. |
 
 In 1.0, 2.0.1, 2.1, 2.2 and 2.3 the carrier rules are expressed only
 in prose; they are equivalent in substance but not given identifiers.
 The textual table in 2.3.2 has remained unchanged in 2.3.3, 2.4 and
 2.5 — confirmed by direct extraction of the selectable text in 2.3.2,
 2.4 and 2.5 (in 2.3.3 the table is image-rendered and not extractable).
+2.5.2 leaves all existing rows untouched and appends BR-FX-DE-04
+(confirmed the same way against the 1.09 and 1.09.2 texts).
 
 ## 11. Visual representation & securing (prose, recommendations)
 
-| Item                                                                                | 1.0 | 2.0.1 | 2.1  | 2.2 → 2.5 |
-| ----------------------------------------------------------------------------------- | --- | ----- | ---- | --------- |
+| Item                                                                                | 1.0 | 2.0.1 | 2.1  | 2.2 → 2.5.2 |
+| ----------------------------------------------------------------------------------- | --- | ----- | ---- | ----------- |
 | Single-page / multi-page good-practice layouts                                      | —   | —     | —    | yes (§5.2) |
 | Profile logos for visual identification                                             | —   | —     | —    | yes (§6.5) |
 | Securing modes: qualified e-sign/seal **or** documented reliable audit trail        | —   | —     | yes  | yes (§4)   |
@@ -189,9 +193,9 @@ The textual table in 2.3.2 has remained unchanged in 2.3.3, 2.4 and
 
 ## 12. Versioning conventions
 
-| Item                                              | 1.0                                              | 2.0.1                                                                 | 2.1                                                                       | 2.2 → 2.5                                                        |
+| Item                                              | 1.0                                              | 2.0.1                                                                 | 2.1                                                                       | 2.2 → 2.5.2                                                      |
 | ------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Spec version                                      | 1.0                                              | 2.0.1                                                                 | 1.0.05 (Factur-X) / 2.1 (ZUGFeRD)                                         | 1.0.06 → 1.0.07 → 1.07.2 → 1.07.3 → 1.08 → 1.09                  |
+| Spec version                                      | 1.0                                              | 2.0.1                                                                 | 1.0.05 (Factur-X) / 2.1 (ZUGFeRD)                                         | 1.0.06 → 1.0.07 → 1.07.2 → 1.07.3 → 1.08 → 1.09 → 1.09.2         |
 | `fx:Version` (or `zf:Version`) value              | `1.0` (`zf:`)                                    | `2p0` (`fx:` with ZUGFeRD URI)                                        | `1p0` / `1.0`                                                             | `1.0` (BR-HYBRID-10 Warning if anything else)                    |
 | URN segment used                                  | `1p0`                                            | `2p0`                                                                 | `1p0` (primary `factur-x.eu`) / `2p0` (legacy `zugferd.de`)               | `1p0` (primary)                                                  |
 | XML BT-24 spec ID (BASIC, e.g.)                   | n/a (pre-EN 16931)                               | `urn:cen.eu:en16931:2017#compliant#urn:zugferd.de:2p0:basic`          | `urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic`             | `urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic`    |
@@ -211,6 +215,7 @@ The textual table in 2.3.2 has remained unchanged in 2.3.3, 2.4 and
 | 2.3.3   | MINIMUM, BASIC WL, BASIC, EN 16931, EXTENDED, XRECHNUNG                                           |
 | 2.4     | MINIMUM, BASIC WL, BASIC, EN 16931, EXTENDED, XRECHNUNG                                           |
 | 2.5     | MINIMUM, BASIC WL, BASIC, EN 16931, EXTENDED, XRECHNUNG                                           |
+| 2.5.2   | MINIMUM, BASIC WL, BASIC, EN 16931, EXTENDED, XRECHNUNG                                           |
 
 ## 14. At-a-glance evolution of identifier strings
 
@@ -222,9 +227,9 @@ order:
 2. `urn:zugferd:pdfa:CrossIndustryDocument:invoice:2p0#` — ZUGFeRD 2.0
    / 2.0.1 / 2.1-legacy (Supplement B)
 3. `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#` — ZUGFeRD 2.1
-   primary, ZUGFeRD 2.2 → 2.5
+   primary, ZUGFeRD 2.2 → 2.5.2
 4. `urn:zugferd:pdfa:CrossIndustryDocument:invoice:1p0#` — legacy
-   variant tolerated in ZUGFeRD 2.2 → 2.5 (note the version segment
+   variant tolerated in ZUGFeRD 2.2 → 2.5.2 (note the version segment
    regressed from `2p0` to `1p0`)
 5. `urn:factur-x:pdfa:CrossIndustryDocument:1p0#` — appears only in
    BR-HYBRID-04 rule text from 2.3.2 onward, apparent transcription
@@ -268,3 +273,32 @@ narrow footprint of the 1.09 update.
   anticipating the Revised EN 16931 2026, ID CTC FR code updates,
   EN 16931 code-list refresh (v17b, valid from 2026-05-15). None of
   these change anything for a PDF-carrier validator like kaltblut.
+
+## 16. Δ from 2.5 to 2.5.2 (Factur-X 1.09.2)
+
+Maintenance release dated 2026-08-04. (The intermediate 1.09.1 of
+2026-06-11 was a hotfix for an EXTENDED-Schematron delivery issue and
+did not republish the specification document.) Carrier-side, verified
+by extracting and diffing the selectable text of the 1.09 and 1.09.2
+PDFs:
+
+- **Spec sections 1–6 are textually identical** to 1.09 — carrier
+  format, embedding, XMP extension schema, AFRelationship matrix,
+  attachment whitelist, securing: no change. The §6.6 "1.08" heading
+  typo and the BR-HYBRID-04 URI inconsistency both persist.
+- **One new rule in the HYBRID appendix (3.d): BR-FX-DE-04**
+  (Warning, DE) — non-down-payment invoices (type code ≠ 386) must
+  carry BT-72 "Actual delivery date", BG-14 "Invoicing period" or
+  BG-26 "Invoice line period" per item; without BT-72 at least the
+  country of delivery (BT-80). This is an XML-content rule; like
+  BR-FX-DE-01/-02 it cannot be checked at the carrier level. All other
+  rows of the BR-HYBRID table are unchanged.
+- **All other Δ are XML-side Schematron maintenance** — BR-CO-27
+  renamed CII-SR-470; EXTENDED BT-151 / BT-151-0 cardinality relaxed to
+  0..1 (with BR-FXEXT-CO-04 as backstop); BR-S-1 / BR-Z-1 / BR-E-1 /
+  BR-AE-1 / BR-IC-1 / BR-G-1 / BR-O-1 / BR-AF-1 / BR-AG-1 replaced by
+  BR-FXEXT-*-01 equivalents in EXTENDED; BR-54 split into
+  BR-FXEXT-BR-54-1/-2; BR-FXEXT-06 / BR-FXEXT-08 corrections;
+  CII-SR-463 to CII-SR-476 added per profile; all Schematron rules now
+  carry a BR ID or `FX-SCH-A-XXXXXX` identifier. Irrelevant to the PDF
+  carrier.

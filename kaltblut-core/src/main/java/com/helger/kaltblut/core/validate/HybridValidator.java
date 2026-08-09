@@ -341,8 +341,7 @@ public final class HybridValidator
   // ===================== helpers =====================
 
   /**
-   * Check the profile × country AFRelationship matrix from {@code docs/requirements/comparison.md}
-   * §5.
+   * Check the profile × country AFRelationship matrix from {@code docs/comparison.md} §5.
    *
    * @return a {@link HybridFinding} if the matrix is violated, or {@code null} if the relationship
    *         is acceptable.

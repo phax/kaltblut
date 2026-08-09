@@ -29,7 +29,7 @@ import com.helger.annotation.concurrent.Immutable;
  * kaltblut test suites.
  * <p>
  * One sample per distinct PDF-carrier generation captured in
- * {@code docs/requirements/comparison.md}. Each constant is a resource path suitable for use with
+ * {@code docs/comparison.md}. Each constant is a resource path suitable for use with
  * {@link ClassLoader#getResourceAsStream(String)} or the corresponding {@code HybridSource}
  * factory.
  *
@@ -67,9 +67,10 @@ public final class KaltblutTestFiles
   /**
    * ZUGFeRD 2.4 BASIC WL sample. PDF carrier rules are identical to 2.3.
    * <p>
-   * Note: the ZUGFeRD 2.5 release shipped this exact same PDF (byte-identical) as its BASIC WL
-   * sample, so this resource doubles as the 2.5 sample. PDF-carrier-wise 2.5 == 2.4, with the
-   * single exception of {@code XLS} being added to the §6.4 attachment whitelist.
+   * Note: the ZUGFeRD 2.5 and 2.5.2 releases shipped this exact same PDF (byte-identical) as their
+   * BASIC WL sample, so this resource doubles as the 2.5 / 2.5.2 sample. PDF-carrier-wise
+   * 2.5 == 2.4, with the single exception of {@code XLS} being added to the §6.4 attachment
+   * whitelist; 2.5.2 == 2.5.
    */
   public static final String ZF_2_4_BASIC_WL = PREFIX + "2.4/BASIC-WL_Einfach_fx.pdf";
 

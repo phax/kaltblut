@@ -13,8 +13,8 @@ What it is **not**: XML business-rule validation (EN 16931 cardinalities, code l
 XRechnung rules) and PDF creation/embedding are explicitly out of scope. For XML rules, use
 [phive-rules-zugferd](https://github.com/phax/phive-rules).
 
-The per-version requirements analysis under `docs/requirements/` (and especially
-`docs/requirements/comparison.md`) is the source of truth for which carrier rules apply per
+The per-version requirements analysis under `docs/` (and especially
+`docs/comparison.md`) is the source of truth for which carrier rules apply per
 ZUGFeRD/Factur-X generation — consult it before changing detection, extraction, or BR-HYBRID-*
 validation logic.
 
@@ -150,8 +150,8 @@ Project-specific points on top of those:
 ## Working on requirements / cross-version logic
 
 When changing detection, extraction, or BR-HYBRID-* validation behaviour, cross-check against
-`docs/requirements/comparison.md` (the cross-version master table) and the relevant per-version
-file (`docs/requirements/<version>.md`). The README's "Supported Versions" table is a quick
+`docs/comparison.md` (the cross-version master table) and the relevant per-version
+file (`docs/<version>.md`). The README's "Supported Versions" table is a quick
 summary of XMP namespace ↔ embedded-XML-filename mappings — keep it in sync if you change either.
 
 ## Releases & versioning

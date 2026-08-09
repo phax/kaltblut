@@ -24,9 +24,9 @@ import org.jspecify.annotations.Nullable;
  * <p>
  * The namespace URI is the most reliable fingerprint for distinguishing ZUGFeRD / Factur-X spec
  * generations. The five URIs in this enum cover every release from ZUGFeRD 1.0 (2014) through
- * Factur-X 1.09 / ZUGFeRD 2.5 (2026-06-10). ZUGFeRD 2.5 reuses the same XMP namespace URI as
- * 2.1 through 2.4 and is therefore not distinguishable from those releases at the XMP-carrier
- * level — only the embedded XML's BT-24 specification identifier reveals it.
+ * Factur-X 1.09.2 / ZUGFeRD 2.5.2 (2026-08-04). ZUGFeRD 2.5 and 2.5.2 reuse the same XMP namespace
+ * URI as 2.1 through 2.4 and are therefore not distinguishable from those releases at the
+ * XMP-carrier level — only the embedded XML's BT-24 specification identifier reveals it.
  *
  * @author Philip Helger
  */

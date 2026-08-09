@@ -15,9 +15,9 @@ XML-side business rules (cardinalities, EN 16931 rules, code lists ...) are out 
 project; use [phive-rules-zugferd](https://github.com/phax/phive-rules) for those.
 
 Per-version requirements analysis used to design this library lives under
-[`docs/requirements/`](docs/requirements/). See
-[`docs/requirements/comparison.md`](docs/requirements/comparison.md) for a cross-version overview
-of every PDF carrier rule from ZUGFeRD 1.0 (2014) through Factur-X 1.09 / ZUGFeRD 2.5 (2026-06-10).
+[`docs/`](docs/). See
+[`docs/comparison.md`](docs/comparison.md) for a cross-version overview
+of every PDF carrier rule from ZUGFeRD 1.0 (2014) through Factur-X 1.09.2 / ZUGFeRD 2.5.2 (2026-08-04).
 
 ## Supported Versions
 
@@ -36,6 +36,7 @@ The detection table covers every published release since 2014:
 | 2.3.3   | 1.07.3   | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 | 2.4     | 1.08     | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 | 2.5     | 1.09     | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
+| 2.5.2   | 1.09.2   | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 
 ## Why "Kaltblut"?
 
@@ -340,16 +341,19 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
+v0.9.5 - 2026-08-09
+* Added support for ZUGFeRD v2.5.2 / Factur-X 1.09.2.
+  No code changes were necessary: the carrier rules are unchanged vs v2.5, and the new BR-FX-DE-04 (Warning, DE) is an XML-content rule that cannot be checked at the PDF-carrier level.
+  See `docs/2.5.2.md` for the analysis.
+
 v0.9.4 - 2026-07-15
 * Security hardening of the untrusted-PDF parsing paths:
   * The XMP `/Metadata` stream is now read through the bounded reader and capped at
-    `HybridLimits.getMaxPdfBytes()`, closing a decompression-bomb vector that previously bypassed
-    the PDF-size limit.
+    `HybridLimits.getMaxPdfBytes()`, closing a decompression-bomb vector that previously bypassed the PDF-size limit.
   * The embedded-files name tree is traversed with a maximum recursion depth, so a cyclic or
     deeply nested tree raises a clean `IOException` instead of a `StackOverflowError`.
   * **Behaviour change**: when veraPDF throws while validating an untrusted PDF, the PDF/A-3 layer
-    now emits an `ERROR` (fail-closed) instead of a `WARNING`, so such a document is reported as
-    invalid rather than valid; the finding no longer echoes the raw exception message.
+    now emits an `ERROR` (fail-closed) instead of a `WARNING`, so such a document is reported as invalid rather than valid; the finding no longer echoes the raw exception message.
   * `HybridAttachment` now defensively copies the payload in its constructor, matching the
     `@Immutable` contract already honoured by `getBytes()`.
   * Attacker-controlled strings (embedded-file names, XMP values) are stripped of control
@@ -358,38 +362,27 @@ v0.9.4 - 2026-07-15
   * The CLI `extract` subcommand writes the output XML with `NOFOLLOW_LINKS`, refusing to write
     through a pre-planted symlink in the output directory.
   * Clarified the `HybridSource.fromUrl` Javadoc: the scheme check does not prevent host-level
-    SSRF or re-validate HTTP redirects — host / IP allow-listing remains the caller's
-    responsibility.
+    SSRF or re-validate HTTP redirects — host / IP allow-listing remains the caller's responsibility.
 
 v0.9.3 - 2026-07-02
-* Added distributed-tracing instrumentation via the vendor-neutral
-  [ph-telemetry](https://github.com/phax/ph-telemetry) facade. `kaltblut-core` and
-  `kaltblut-verapdf` emit spans around the usual hotspots (source read, PDFBox parse, XMP parse,
-  attachment extraction, BR-HYBRID + PDF/A-3 validation) and degrade to no-ops when no tracer is
-  registered — no OpenTelemetry dependency is added to the library. The `kaltblut-cli` module ships
-  an opt-in OpenTelemetry binding (`-Dotel.enabled=true` / `OTEL_ENABLED=true`). See
-  [Telemetry](#telemetry-opentelemetry).
+* Added distributed-tracing instrumentation via the vendor-neutral [ph-telemetry](https://github.com/phax/ph-telemetry) facade.
+  `kaltblut-core` and `kaltblut-verapdf` emit spans around the usual hotspots (source read, PDFBox parse, XMP parse, attachment extraction, BR-HYBRID + PDF/A-3 validation) and degrade to no-ops when no tracer is registered — no OpenTelemetry dependency is added to the library.
+  The `kaltblut-cli` module ships an opt-in OpenTelemetry binding (`-Dotel.enabled=true` / `OTEL_ENABLED=true`).
+  See [Telemetry](#telemetry-opentelemetry).
 
 v0.9.2 - 2026-06-10
 * Added support for ZUGFeRD v2.5
 
 v0.9.1 - 2026-05-13
-* Validation: the result of `HybridValidator.validate` is now structured as a list of
-  `HybridValidationLayer`s (`BR_HYBRID` + optional `PDF_A3`, identified by
-  `EHybridValidationLayerKind`) instead of a flat finding list. Each layer carries its own findings
-  and wall-clock `Duration`. Aggregate predicates on `HybridValidationResult` continue to work
-  across all layers.
-* **Breaking**: `ValidationResult` renamed to `HybridValidationResult`, and the new
-  per-layer container is `HybridValidationLayer`.
+* Validation: the result of `HybridValidator.validate` is now structured as a list of `HybridValidationLayer`s (`BR_HYBRID` + optional `PDF_A3`, identified by `EHybridValidationLayerKind`) instead of a flat finding list.
+  Each layer carries its own findings and wall-clock `Duration`.
+  Aggregate predicates on `HybridValidationResult` continue to work across all layers.
+* **Breaking**: `ValidationResult` renamed to `HybridValidationResult`, and the new per-layer container is `HybridValidationLayer`.
 * **Breaking**: `EHybridSeverity.FATAL` renamed to `ERROR`. Predicate methods follow:
   `isFatal()` → `isError()`, `hasFatal()` → `hasError()`, `hasFatalRule()` → `hasErrorRule()`.
-* `EHybridSeverity` entries now carry the equivalent ph-commons `EErrorLevel` via
-  `getErrorLevel()`, so consumers mapping findings into ph-commons error infrastructure no
-  longer need a translation table.
-* `EZugferdCountry` now implements `IHasID<String>` with `getID()` and the static
-  `getFromIDOrNull(String)` factory, matching the style of the other ph-commons-based enums.
-* CLI `validate` subcommand prints one line per layer with its kind, finding count, and
-  duration, then the layer's findings indented underneath.
+* `EHybridSeverity` entries now carry the equivalent ph-commons `EErrorLevel` via `getErrorLevel()`, so consumers mapping findings into ph-commons error infrastructure no longer need a translation table.
+* `EZugferdCountry` now implements `IHasID<String>` with `getID()` and the static `getFromIDOrNull(String)` factory, matching the style of the other ph-commons-based enums.
+* CLI `validate` subcommand prints one line per layer with its kind, finding count, and duration, then the layer's findings indented underneath.
 
 v0.9.0 - 2026-05-13
 * Detection: recognises all five XMP extension-schema namespaces seen across ZUGFeRD 1.0, 2.0.1, 2.1, 2.2, 2.3, 2.3.2, 2.3.3 and 2.4.

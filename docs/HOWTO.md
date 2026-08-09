@@ -1,4 +1,4 @@
-# How to extend `docs/requirements/` when a new ZUGFeRD / Factur-X release lands
+# How to extend `docs/` when a new ZUGFeRD / Factur-X release lands
 
 Captures the actual workflow used for the 2.5 / Factur-X 1.09 update. Use
 this as a checklist next time a new spec ships so the per-version files
@@ -6,8 +6,8 @@ stay narrow and the comparison table stays honest.
 
 ## Scope reminder
 
-kaltblut is a **PDF-carrier** library. Every file under
-`docs/requirements/` is scoped to the PDF side:
+kaltblut is a **PDF-carrier** library. Every per-version file under
+`docs/` is scoped to the PDF side:
 
 - carrier format (PDF/A-3, PDF/A-4f)
 - XMP extension schema (namespace URI, prefix, fields)
@@ -227,7 +227,8 @@ inadvertently broke.
   visible "2.4 yes / 2.5 yes" tells readers it was rechecked, not
   assumed.
 - **Don't update README without updating the per-version `.md`.**
-  README is a summary; the source of truth is `docs/requirements/`.
+  README is a summary; the source of truth is the per-version files
+  under `docs/`.
 - **Don't add code for a release that reuses every existing URI and
   rule ID.** kaltblut's flavor enum is XMP-namespace-keyed; if nothing
   new appears at that level, only docs change.
