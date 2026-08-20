@@ -38,6 +38,44 @@ The detection table covers every published release since 2014:
 | 2.5     | 1.09     | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 | 2.5.2   | 1.09.2   | `urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`         | `factur-x.xml` / `xrechnung.xml` |
 
+### Profiles per version
+
+`EZugferdProfile` mirrors the `fx:ConformanceLevel` values (`zf:ConformanceLevel` in ZUGFeRD 1.0)
+that each spec generation permits:
+
+| ZUGFeRD | Factur-X | MINIMUM | BASIC WL | BASIC | COMFORT | EN 16931 | EXTENDED | XRECHNUNG |
+| ------- | -------- | ------- | -------- | ----- | ------- | -------- | -------- | --------- |
+| 1.0     | n/a      | —       | —        | yes   | yes     | —        | yes      | —         |
+| 2.0.1   | n/a      | yes     | yes      | yes   | —       | yes      | yes      | —         |
+| 2.1     | 1.0.05   | yes     | yes      | yes   | —       | yes      | yes      | —         |
+| 2.2     | 1.0.06   | yes     | yes      | yes   | —       | yes      | yes      | yes       |
+| 2.3     | 1.0.07   | yes     | yes      | yes   | —       | yes      | yes      | yes       |
+| 2.3.2   | 1.07.2   | yes     | yes      | yes   | —       | yes      | yes      | yes       |
+| 2.3.3   | 1.07.3   | yes     | yes      | yes   | —       | yes      | yes      | yes       |
+| 2.4     | 1.08     | yes     | yes      | yes   | —       | yes      | yes      | yes       |
+| 2.5     | 1.09     | yes     | yes      | yes   | —       | yes      | yes      | yes       |
+| 2.5.2   | 1.09.2   | yes     | yes      | yes   | —       | yes      | yes      | yes       |
+
+Notes:
+
+- `COMFORT` is the ZUGFeRD 1.0 name of the EN 16931-compliant core profile; from 2.0.1 onward the
+  XMP value for it is `EN 16931`. `EZugferdProfile.getFromIDOrNull` additionally tolerates the
+  unspaced `EN16931` spelling found in the wild.
+- `MINIMUM` and `BASIC WL` were introduced in 2.0.1 — ZUGFeRD 1.0 knows neither.
+- `XRECHNUNG` was introduced in 2.2 as a reference profile; it changes the embedded XML name from
+  `factur-x.xml` to `xrechnung.xml`. The legacy `zugferd.de` XMP extension schemas (2.1 Supplement B
+  and the deprecated variant retained in 2.2 → 2.5.2) never permit `XRECHNUNG`.
+- Country restrictions on top of the table, enforced by `HybridValidator` from `EZugferdCountry`:
+  DE↔DE must not use `MINIMUM` (BR-HYBRID-DE-01) or `BASIC WL` (BR-HYBRID-DE-02), FR↔FR must not
+  use `XRECHNUNG` (BR-HYBRID-FR-01). Numbered from 2.3.2 onward; earlier generations state the same
+  substance in prose.
+- Detection is deliberately version-agnostic: `HybridInspector.detectProfile` maps whatever
+  `ConformanceLevel` string is present onto `EZugferdProfile`, and BR-HYBRID-07 only checks
+  membership in the code list — it does not reject a profile that postdates the detected flavor.
+
+Source: [`docs/comparison.md`](docs/comparison.md) §6/§7 (permitted `ConformanceLevel` values) and
+§13 (profiles per version).
+
 ## Why "Kaltblut"?
 
 **Kaltblut** is German for the family of heavy draft horse breeds — the strongest and steadiest of the *Zugpferde*.
@@ -117,7 +155,8 @@ throws `IOException` rather than letting the JVM OOM.
 The model classes in `com.helger.kaltblut.core.model` are immutable value objects:
 
 - `EZugferdFlavor` — namespace-URI fingerprint of the spec generation.
-- `EZugferdProfile` — `MINIMUM`, `BASIC_WL`, `BASIC`, `COMFORT`, `EN_16931`, `EXTENDED`, `XRECHNUNG`.
+- `EZugferdProfile` — `MINIMUM`, `BASIC_WL`, `BASIC`, `COMFORT`, `EN_16931`, `EXTENDED`, `XRECHNUNG`
+  (see [Profiles per version](#profiles-per-version) for which spec generation permits which).
 - `EAFRelationship` — `Data`, `Source`, `Alternative`, `Supplement`, `Unspecified`.
 - `EZugferdCountry` — `DE`, `FR`, `OTHER` (drives country-specific BR-HYBRID rules).
 - `HybridMetadata` — single snapshot of XMP fields + `/AF` data.
@@ -340,6 +379,9 @@ discovered via `ServiceLoader`; only the first implementation found is used.
 Apache License, Version 2.0.
 
 ## News and Noteworthy
+
+v0.9.6 - work in progress
+* README: added a "Profiles per version" mapping table (ZUGFeRD / Factur-X version → permitted `fx:ConformanceLevel` profiles), derived from `docs/comparison.md`.
 
 v0.9.5 - 2026-08-09
 * Added support for ZUGFeRD v2.5.2 / Factur-X 1.09.2.
