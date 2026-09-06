@@ -66,7 +66,7 @@
     <pdfbox.version>3.0.8</pdfbox.version>
     <picocli.version>4.7.7</picocli.version>
     <verapdf.version>1.30.2</verapdf.version>
-    <ph-telemetry.version>1.0.1</ph-telemetry.version>
+    <ph-telemetry.version>1.0.2</ph-telemetry.version>
     <opentelemetry.version>1.65.0</opentelemetry.version>
     <okhttp.version>5.5.0</okhttp.version>
   </properties>
