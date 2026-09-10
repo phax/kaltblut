@@ -23,18 +23,14 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 /**
- * Command-line front-end for kaltblut. Wraps the four library entry points as picocli
- * subcommands.
+ * Command-line front-end for kaltblut. Wraps the four library entry points as picocli subcommands.
  *
  * @author Philip Helger
  */
 @Command (name = "kaltblut",
           mixinStandardHelpOptions = true,
           description = "ZUGFeRD / Factur-X hybrid invoice toolkit (detect, extract, validate)",
-          subcommands = { InspectCommand.class,
-                          ExtractCommand.class,
-                          AttachmentsCommand.class,
-                          ValidateCommand.class })
+          subcommands = { InspectCommand.class, ExtractCommand.class, AttachmentsCommand.class, ValidateCommand.class })
 public final class KaltblutMain
 {
   public static void main (final String [] aArgs)

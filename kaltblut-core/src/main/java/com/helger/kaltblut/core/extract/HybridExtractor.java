@@ -79,8 +79,8 @@ public final class HybridExtractor
    *         on I/O / PDF / XMP parsing failure or limit violation.
    */
   @Nullable
-  public static byte [] extractInvoiceXml (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
-                                                                                                                      throws IOException
+  public static byte [] extractInvoiceXml (@NonNull final IHybridSource aSource,
+                                           @NonNull final HybridLimits aLimits) throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");
@@ -163,8 +163,8 @@ public final class HybridExtractor
    *         on parsing failure or default-limit violation.
    */
   @Nullable
-  public static byte [] extractAttachment (@NonNull final IHybridSource aSource, @NonNull final String sName)
-                                                                                                              throws IOException
+  public static byte [] extractAttachment (@NonNull final IHybridSource aSource,
+                                           @NonNull final String sName) throws IOException
   {
     return extractAttachment (aSource, sName, HybridLimits.DEFAULTS);
   }

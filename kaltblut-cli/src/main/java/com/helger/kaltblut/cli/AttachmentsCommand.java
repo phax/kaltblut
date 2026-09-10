@@ -31,7 +31,8 @@ import com.helger.kaltblut.core.source.IHybridSource;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
-@Command (name = "attachments", description = "List embedded files (invoice XML + supporting documents) in each input PDF.")
+@Command (name = "attachments",
+          description = "List embedded files (invoice XML + supporting documents) in each input PDF.")
 public final class AttachmentsCommand implements Callable <Integer>
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (AttachmentsCommand.class);
@@ -69,7 +70,8 @@ public final class AttachmentsCommand implements Callable <Integer>
           System.out.println ("  - " +
                               CLIStringHelper.getConsoleSafe (aAtt.getName ()) +
                               "  [" +
-                              (aAtt.getMimeType () == null ? "?" : CLIStringHelper.getConsoleSafe (aAtt.getMimeType ())) +
+                              (aAtt.getMimeType () == null ? "?"
+                                                           : CLIStringHelper.getConsoleSafe (aAtt.getMimeType ())) +
                               "]  AFRel=" +
                               CLIStringHelper.getConsoleSafe (aAtt.getRawAFRelationship ()) +
                               "  size=" +

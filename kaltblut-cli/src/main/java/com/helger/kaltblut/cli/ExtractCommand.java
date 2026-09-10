@@ -44,8 +44,7 @@ public final class ExtractCommand implements Callable <Integer>
            description = "Directory to write extracted XML files to (default: current directory).")
   private String m_sOutputDir = ".";
 
-  @Option (names = { "-s",
-                     "--suffix" },
+  @Option (names = { "-s", "--suffix" },
            description = "Output filename suffix (default: -invoice). Final name = <pdfBaseName><suffix>.xml")
   private String m_sSuffix = "-invoice";
 

@@ -167,8 +167,8 @@ public final class HybridSource
    * (e.g. <code>http://169.254.169.254/</code>, <code>localhost</code>). When forwarding untrusted
    * URLs, the caller is responsible for host / IP allow-listing and redirect policy. Connect and
    * read timeouts default to {@link #DEFAULT_URL_CONNECT_TIMEOUT} and
-   * {@link #DEFAULT_URL_READ_TIMEOUT} respectively; use {@link #fromUrl(URL, Duration, Duration)} to
-   * override.
+   * {@link #DEFAULT_URL_READ_TIMEOUT} respectively; use {@link #fromUrl(URL, Duration, Duration)}
+   * to override.
    *
    * @param aUrl
    *        the URL. May not be <code>null</code>; scheme must be <code>http</code> or
@@ -258,8 +258,8 @@ public final class HybridSource
    *         if the resource is not found or cannot be read.
    */
   @NonNull
-  public static IHybridSource fromClasspath (@NonNull final String sResourcePath, @NonNull final ClassLoader aLoader)
-                                                                                                                      throws IOException
+  public static IHybridSource fromClasspath (@NonNull final String sResourcePath,
+                                             @NonNull final ClassLoader aLoader) throws IOException
   {
     ValueEnforcer.notNull (sResourcePath, "ResourcePath");
     ValueEnforcer.notNull (aLoader, "Loader");
@@ -349,12 +349,12 @@ public final class HybridSource
     public byte [] getBytes () throws IOException
     {
       // Fast path: cached, read lock only.
-      final byte [] aHit = m_aRWLock.readLockedGet ( () -> m_aCached);
+      final byte [] aHit = m_aRWLock.readLockedGet (() -> m_aCached);
       if (aHit != null)
         return aHit;
 
       // Slow path: acquire write lock and double-check.
-      return m_aRWLock.writeLockedGetThrowing ( () -> {
+      return m_aRWLock.writeLockedGetThrowing (() -> {
         if (m_aCached == null)
           m_aCached = Files.readAllBytes (m_aPath);
         return m_aCached;
@@ -364,7 +364,7 @@ public final class HybridSource
     @Override
     public long getSize ()
     {
-      final byte [] aHit = m_aRWLock.readLockedGet ( () -> m_aCached);
+      final byte [] aHit = m_aRWLock.readLockedGet (() -> m_aCached);
       if (aHit != null)
         return aHit.length;
 
@@ -492,11 +492,11 @@ public final class HybridSource
     @NonNull
     public byte [] getBytes () throws IOException
     {
-      final byte [] aHit = m_aRWLock.readLockedGet ( () -> m_aCached);
+      final byte [] aHit = m_aRWLock.readLockedGet (() -> m_aCached);
       if (aHit != null)
         return aHit;
 
-      return m_aRWLock.writeLockedGetThrowing ( () -> {
+      return m_aRWLock.writeLockedGetThrowing (() -> {
         if (m_aCached != null)
           return m_aCached;
         return _fetchUnboundedUnderWriteLock ();
@@ -510,7 +510,7 @@ public final class HybridSource
       if (nMaxBytes < 0)
         return getBytes ();
 
-      final byte [] aHit = m_aRWLock.readLockedGet ( () -> m_aCached);
+      final byte [] aHit = m_aRWLock.readLockedGet (() -> m_aCached);
       if (aHit != null)
       {
         if (aHit.length > nMaxBytes)
@@ -524,7 +524,7 @@ public final class HybridSource
         return aHit;
       }
 
-      return m_aRWLock.writeLockedGetThrowing ( () -> {
+      return m_aRWLock.writeLockedGetThrowing (() -> {
         if (m_aCached != null)
         {
           if (m_aCached.length > nMaxBytes)
@@ -544,7 +544,7 @@ public final class HybridSource
     @Override
     public long getSize ()
     {
-      final byte [] aHit = m_aRWLock.readLockedGet ( () -> m_aCached);
+      final byte [] aHit = m_aRWLock.readLockedGet (() -> m_aCached);
       return aHit != null ? aHit.length : -1L;
     }
 

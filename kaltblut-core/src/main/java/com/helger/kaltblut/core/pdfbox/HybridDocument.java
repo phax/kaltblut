@@ -142,8 +142,8 @@ public final class HybridDocument implements AutoCloseable
    *         <code>aLimits.getMaxPdfBytes()</code>.
    */
   @NonNull
-  public static HybridDocument open (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
-                                                                                                                throws IOException
+  public static HybridDocument open (@NonNull final IHybridSource aSource,
+                                     @NonNull final HybridLimits aLimits) throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");
@@ -573,9 +573,9 @@ public final class HybridDocument implements AutoCloseable
   private static boolean _isInterestingLocalName (@NonNull final String sLocalName)
   {
     return XMP_DOCUMENT_TYPE.equals (sLocalName) ||
-      XMP_DOCUMENT_FILE_NAME.equals (sLocalName) ||
-      XMP_VERSION.equals (sLocalName) ||
-      XMP_CONFORMANCE_LEVEL.equals (sLocalName);
+           XMP_DOCUMENT_FILE_NAME.equals (sLocalName) ||
+           XMP_VERSION.equals (sLocalName) ||
+           XMP_CONFORMANCE_LEVEL.equals (sLocalName);
   }
 
   private static void _collectFieldsForNamespaceRecursive (@NonNull final Node aNode,

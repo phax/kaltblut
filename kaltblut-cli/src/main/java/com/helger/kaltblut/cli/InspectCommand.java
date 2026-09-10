@@ -70,7 +70,8 @@ public final class InspectCommand implements Callable <Integer>
         System.out.println ("  Flavor:             " + aMeta.getFlavor ());
         System.out.println ("  Namespace URI:      " + CLIStringHelper.getConsoleSafe (aMeta.getNamespaceURI ()));
         System.out.println ("  XMP DocumentType:   " + CLIStringHelper.getConsoleSafe (aMeta.getXmpDocumentType ()));
-        System.out.println ("  XMP DocFileName:    " + CLIStringHelper.getConsoleSafe (aMeta.getXmpDocumentFileName ()));
+        System.out.println ("  XMP DocFileName:    " +
+                            CLIStringHelper.getConsoleSafe (aMeta.getXmpDocumentFileName ()));
         System.out.println ("  XMP Version:        " + CLIStringHelper.getConsoleSafe (aMeta.getXmpVersion ()));
         System.out.println ("  Profile:            " +
                             aMeta.getProfile () +

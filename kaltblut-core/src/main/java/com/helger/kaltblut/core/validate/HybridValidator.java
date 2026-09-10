@@ -130,10 +130,10 @@ public final class HybridValidator
         ICommonsList <HybridFinding> aPdfAFindings = _runPdfA3 (aSource);
         // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
         if (m_aSettings.isApplyDePdfADowngrade () &&
-          m_aSettings.getCountry () == EZugferdCountry.DE &&
-          bXmlExtractable &&
-          aPdfAFindings != null &&
-          !aPdfAFindings.isEmpty ())
+            m_aSettings.getCountry () == EZugferdCountry.DE &&
+            bXmlExtractable &&
+            aPdfAFindings != null &&
+            !aPdfAFindings.isEmpty ())
         {
           final ICommonsList <HybridFinding> aDowngraded = new CommonsArrayList <> ();
           for (final HybridFinding aF : aPdfAFindings)
@@ -415,9 +415,9 @@ public final class HybridValidator
   {
     // Code list values per the spec versions covered. We accept ZUGFeRD 1.0's mixed case too.
     return FN_FACTUR_X.equals (sName) ||
-      FN_XRECHNUNG.equals (sName) ||
-      FN_ZUGFERD_LOWER.equals (sName) ||
-      FN_ZUGFERD_MIXED.equals (sName);
+           FN_XRECHNUNG.equals (sName) ||
+           FN_ZUGFERD_LOWER.equals (sName) ||
+           FN_ZUGFERD_MIXED.equals (sName);
   }
 
   // ---------------- PDF/A-3 SPI ----------------

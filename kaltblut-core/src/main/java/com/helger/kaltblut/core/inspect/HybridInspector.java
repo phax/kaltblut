@@ -71,8 +71,8 @@ public final class HybridInspector
    * @throws IOException
    *         on I/O failure or limit violation.
    */
-  public static boolean isHybridInvoice (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
-                                                                                                                    throws IOException
+  public static boolean isHybridInvoice (@NonNull final IHybridSource aSource,
+                                         @NonNull final HybridLimits aLimits) throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");
@@ -107,8 +107,8 @@ public final class HybridInspector
    *         on I/O failure or limit violation.
    */
   @Nullable
-  public static EZugferdFlavor detectFlavor (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
-                                                                                                                        throws IOException
+  public static EZugferdFlavor detectFlavor (@NonNull final IHybridSource aSource,
+                                             @NonNull final HybridLimits aLimits) throws IOException
   {
     return readMetadata (aSource, aLimits).getFlavor ();
   }
@@ -173,8 +173,8 @@ public final class HybridInspector
    *         on I/O / PDF / XMP parsing failure or limit violation.
    */
   @NonNull
-  public static HybridMetadata readMetadata (@NonNull final IHybridSource aSource, @NonNull final HybridLimits aLimits)
-                                                                                                                        throws IOException
+  public static HybridMetadata readMetadata (@NonNull final IHybridSource aSource,
+                                             @NonNull final HybridLimits aLimits) throws IOException
   {
     ValueEnforcer.notNull (aSource, "Source");
     ValueEnforcer.notNull (aLimits, "Limits");

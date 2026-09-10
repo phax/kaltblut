@@ -37,8 +37,8 @@ public final class CKaltblutOtel
   public static final String INSTRUMENTATION_SCOPE_VERSION = CKaltblutVersion.BUILD_VERSION;
 
   /**
-   * System property / environment variable that opts the CLI in to installing the OpenTelemetry SDK.
-   * Checked as the system property {@code otel.enabled} and the environment variable
+   * System property / environment variable that opts the CLI in to installing the OpenTelemetry
+   * SDK. Checked as the system property {@code otel.enabled} and the environment variable
    * {@code OTEL_ENABLED}; either being {@code true} enables the export pipeline.
    */
   public static final String PROPERTY_OTEL_ENABLED = "otel.enabled";

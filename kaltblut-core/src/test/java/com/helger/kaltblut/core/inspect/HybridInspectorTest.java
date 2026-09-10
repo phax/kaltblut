@@ -73,7 +73,8 @@ public final class HybridInspectorTest
     // XRECHNUNG profile uses xrechnung.xml instead of factur-x.xml.
     assertEquals ("xrechnung.xml", aMeta.getEmbeddedFileName ());
     assertEquals ("xrechnung.xml", aMeta.getXmpDocumentFileName ());
-    // The shipped sample uses an anomalous fx:Version="2.1" — captured here to lock that observation in.
+    // The shipped sample uses an anomalous fx:Version="2.1" — captured here to lock that
+    // observation in.
     assertEquals ("2.1", aMeta.getXmpVersion ());
   }
 
