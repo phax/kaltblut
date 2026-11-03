@@ -380,8 +380,10 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
-v0.9.6 - work in progress
-* Fixed an `IndexOutOfBoundsException` in the veraPDF validation of PDFs without PDF/A identification in the XMP metadata. A `VERAPDF-FLAVOUR` error is reported instead. See [#1](https://github.com/phax/kaltblut/issues/1)
+v0.9.6 - 2026-11-03
+* Fixed an `IndexOutOfBoundsException` in the veraPDF validation of PDFs without PDF/A identification in the XMP metadata.
+  A `VERAPDF-FLAVOUR` error is reported instead.
+  See [#1](https://github.com/phax/kaltblut/issues/1)
 * README: added a "Profiles per version" mapping table (ZUGFeRD / Factur-X version → permitted `fx:ConformanceLevel` profiles), derived from `docs/comparison.md`.
 
 v0.9.5 - 2026-08-09
@@ -421,7 +423,8 @@ v0.9.1 - 2026-05-13
   Each layer carries its own findings and wall-clock `Duration`.
   Aggregate predicates on `HybridValidationResult` continue to work across all layers.
 * **Breaking**: `ValidationResult` renamed to `HybridValidationResult`, and the new per-layer container is `HybridValidationLayer`.
-* **Breaking**: `EHybridSeverity.FATAL` renamed to `ERROR`. Predicate methods follow:
+* **Breaking**: `EHybridSeverity.FATAL` renamed to `ERROR`.
+  Predicate methods follow:
   `isFatal()` → `isError()`, `hasFatal()` → `hasError()`, `hasFatalRule()` → `hasErrorRule()`.
 * `EHybridSeverity` entries now carry the equivalent ph-commons `EErrorLevel` via `getErrorLevel()`, so consumers mapping findings into ph-commons error infrastructure no longer need a translation table.
 * `EZugferdCountry` now implements `IHasID<String>` with `getID()` and the static `getFromIDOrNull(String)` factory, matching the style of the other ph-commons-based enums.
