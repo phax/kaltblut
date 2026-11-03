@@ -381,6 +381,7 @@ Apache License, Version 2.0.
 ## News and Noteworthy
 
 v0.9.6 - work in progress
+* Fixed an `IndexOutOfBoundsException` in the veraPDF validation of PDFs without PDF/A identification in the XMP metadata. A `VERAPDF-FLAVOUR` error is reported instead. See [#1](https://github.com/phax/kaltblut/issues/1)
 * README: added a "Profiles per version" mapping table (ZUGFeRD / Factur-X version → permitted `fx:ConformanceLevel` profiles), derived from `docs/comparison.md`.
 
 v0.9.5 - 2026-08-09

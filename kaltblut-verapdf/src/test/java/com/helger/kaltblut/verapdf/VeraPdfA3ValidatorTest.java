@@ -16,14 +16,18 @@
  */
 package com.helger.kaltblut.verapdf;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.ServiceLoader;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
 import org.junit.Test;
 
+import com.helger.base.io.nonblocking.NonBlockingByteArrayOutputStream;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.kaltblut.core.model.EZugferdCountry;
 import com.helger.kaltblut.core.source.HybridSource;
@@ -79,5 +83,25 @@ public final class VeraPdfA3ValidatorTest
     // Validator must complete and produce at least the BR-HYBRID-01 informational finding.
     assertNotNull (aRes.findByRuleID ("BR-HYBRID-01"));
     assertNotNull (aRes.getFindings (EHybridSeverity.ERROR));
+  }
+
+  @Test
+  public void testValidate_NoPdfAIdentification () throws IOException
+  {
+    // A plain PDF without XMP metadata: veraPDF detects no flavour at all (issue #1)
+    final byte [] aBytes;
+    try (final PDDocument aDoc = new PDDocument ();
+         final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
+    {
+      aDoc.addPage (new PDPage ());
+      aDoc.save (aBAOS);
+      aBytes = aBAOS.toByteArray ();
+    }
+
+    final ICommonsList <HybridFinding> aFindings = new VeraPdfA3ValidatorSPI ().validatePdfA3 (HybridSource.fromBytes (aBytes));
+    assertNotNull (aFindings);
+    assertEquals (1, aFindings.size ());
+    assertEquals ("VERAPDF-FLAVOUR", aFindings.getFirstOrNull ().getRuleID ());
+    assertEquals (EHybridSeverity.ERROR, aFindings.getFirstOrNull ().getSeverity ());
   }
 }

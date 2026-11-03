@@ -18,6 +18,7 @@ package com.helger.kaltblut.verapdf;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -102,7 +103,10 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
           try (final ITelemetrySpan aSpanParse = Telemetry.startSpan ("kaltblut.pdfa3.parse",
                                                                       ETelemetrySpanKind.INTERNAL))
           {
-            eDetected = aParser.getFlavour ();
+            // Do not use getFlavour () - it throws an IndexOutOfBoundsException if no flavour was
+            // detected (e.g. no XMP metadata or no PDF/A identification schema)
+            final List <PDFAFlavour> aFlavours = aParser.getFlavours ();
+            eDetected = aFlavours == null || aFlavours.isEmpty () ? PDFAFlavour.NO_FLAVOUR : aFlavours.get (0);
             aSpanParse.setAttribute ("kaltblut.pdfa.flavour", String.valueOf (eDetected));
             aSpanParse.setStatusOk ();
           }
@@ -112,10 +116,11 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
           {
             aOut.add (new HybridFinding ("VERAPDF-FLAVOUR",
                                          EHybridSeverity.ERROR,
-                                         "PDF/A flavor '" +
-                                                                eDetected +
-                                                                "' is not acceptable for a hybrid invoice. " +
-                                                                "Expected PDF/A-3 (3a, 3b or 3u) or PDF/A-4f.",
+                                         (eDetected == PDFAFlavour.NO_FLAVOUR ? "No PDF/A identification found in the XMP metadata"
+                                                                              : "PDF/A flavor '" +
+                                                                                eDetected +
+                                                                                "' is not acceptable for a hybrid invoice") +
+                                                                ". Expected PDF/A-3 (3a, 3b or 3u) or PDF/A-4f.",
                                          null));
             aSpan.setAttribute ("kaltblut.pdfa.acceptable", false);
             aSpan.setAttribute ("kaltblut.pdfa.finding_count", aOut.size ());
