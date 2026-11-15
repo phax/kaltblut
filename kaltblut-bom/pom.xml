@@ -27,7 +27,7 @@
   </parent>
   <groupId>com.helger.kaltblut</groupId>
   <artifactId>kaltblut-bom</artifactId>
-  <version>0.9.7-SNAPSHOT</version>
+  <version>0.9.7</version>
   <packaging>pom</packaging>
   <name>kaltblut-bom</name>
   <description>Bill of Materials for all kaltblut artifacts</description>
@@ -44,7 +44,7 @@
     <connection>scm:git:https://github.com/phax/kaltblut.git</connection>
     <developerConnection>scm:git:https://github.com/phax/kaltblut.git</developerConnection>
     <url>https://github.com/phax/kaltblut</url>
-    <tag>HEAD</tag>
+    <tag>kaltblut-parent-pom-0.9.7</tag>
   </scm>
   <organization>
     <name>Philip Helger</name>
