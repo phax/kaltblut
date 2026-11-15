@@ -66,7 +66,7 @@
     <pdfbox.version>3.0.8</pdfbox.version>
     <picocli.version>4.7.7</picocli.version>
     <verapdf.version>1.30.4</verapdf.version>
-    <ph-telemetry.version>1.1.1</ph-telemetry.version>
+    <ph-telemetry.version>1.1.2</ph-telemetry.version>
     <opentelemetry.version>1.68.0</opentelemetry.version>
     <okhttp.version>5.5.1</okhttp.version>
   </properties>
@@ -75,20 +75,19 @@
     <dependencies>
       <dependency>
         <groupId>com.helger.commons</groupId>
-        <artifactId>ph-commons-parent-pom</artifactId>
-        <version>12.6.0</version>
+        <artifactId>ph-commons-bom</artifactId>
+        <version>12.7.1</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-
-      <!-- Vendor-neutral telemetry facade (tracing/metrics) + its OpenTelemetry binding. -->
       <dependency>
         <groupId>com.helger.telemetry</groupId>
-        <artifactId>ph-telemetry-parent-pom</artifactId>
+        <artifactId>ph-telemetry-bom</artifactId>
         <version>${ph-telemetry.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      
       <!-- OpenTelemetry SDK + exporters (only pulled by the CLI deployment boundary). -->
       <dependency>
         <groupId>io.opentelemetry</groupId>
@@ -97,7 +96,12 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-
+      
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>${junit4.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.apache.pdfbox</groupId>
         <artifactId>pdfbox</artifactId>
@@ -136,6 +140,7 @@
   </dependencies>
 
   <modules>
+    <module>kaltblut-bom</module>
     <module>kaltblut-testfiles</module>
     <module>kaltblut-core</module>
     <module>kaltblut-verapdf</module>

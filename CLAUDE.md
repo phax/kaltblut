@@ -39,7 +39,7 @@ The CLI fat JAR comes out of `mvn clean package` at
 
 ## Module layout & dependency direction
 
-Four modules, strictly layered (parent POM at repo root):
+Four modules, strictly layered (parent POM at repo root), plus `kaltblut-bom`:
 
 ```
 kaltblut-testfiles   ← classpath-resource locator + sample PDFs (test-scope dep of others)
@@ -58,6 +58,9 @@ kaltblut-cli         ← picocli command-line client, depends on both ───�
   `META-INF/services/com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI`. It uses the veraPDF
   `-jakarta` artifact line (JAXB 4.x / `jakarta.xml.bind`) — do **not** introduce the legacy
   `javax.xml.bind` 2.x line.
+- `kaltblut-bom` is a standalone BOM (own parent `com.helger:parent-pom`, no reference to the
+  Kaltblut parent POM) listing `kaltblut-testfiles`, `kaltblut-core` and `kaltblut-verapdf`. When a
+  new library module is added, add it to the BOM as well.
 - `kaltblut-testfiles` exposes `KaltblutTestFiles.*` constants pointing at one representative PDF
   per spec generation under `external/zugferd/`. New tests should reuse these rather than
   ship new sample PDFs.
@@ -156,5 +159,5 @@ summary of XMP namespace ↔ embedded-XML-filename mappings — keep it in sync 
 
 ## Releases & versioning
 
-Current version is `0.9.0-SNAPSHOT` (parent POM). Parent: `com.helger:parent-pom:3.0.3`.
+Current version is `0.9.7-SNAPSHOT` (parent POM). Parent: `com.helger:parent-pom:3.2.0`.
 Snapshots are deployed by CI from JDK 17 builds on push via the `release-snapshot` profile.

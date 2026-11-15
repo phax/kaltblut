@@ -106,6 +106,8 @@ This is a multi-module Maven project:
 - `kaltblut-verapdf` — PDF/A-3 validation adapter that wires veraPDF to the
   `IPdfA3ValidatorSPI` SPI. Optional; pull it in only if you need PDF/A-3 conformance checks.
 - `kaltblut-cli` — the command-line client (picocli). Builds a standalone fat JAR.
+- `kaltblut-bom` — Bill of Materials that pins the versions of all published library artifacts
+  (`kaltblut-core`, `kaltblut-verapdf`, `kaltblut-testfiles`).
 
 ## Key Library Concepts
 
@@ -302,6 +304,32 @@ The build produces (replacing `x.y.z` with the effective version):
 
 ## Maven Coordinates
 
+The simplest way to keep all Kaltblut artifacts on the same version is to import the BOM in your
+`<dependencyManagement>` section and then declare the dependencies without a version:
+
+```xml
+<dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>com.helger.kaltblut</groupId>
+      <artifactId>kaltblut-bom</artifactId>
+      <version>x.y.z</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+  </dependencies>
+</dependencyManagement>
+
+<dependencies>
+  <dependency>
+    <groupId>com.helger.kaltblut</groupId>
+    <artifactId>kaltblut-core</artifactId>
+  </dependency>
+</dependencies>
+```
+
+Alternatively, reference the artifacts directly with an explicit version:
+
 ```xml
 <!-- Core library: detection + extraction + BR-HYBRID validation -->
 <dependency>
@@ -379,6 +407,10 @@ discovered via `ServiceLoader`; only the first implementation found is used.
 Apache License, Version 2.0.
 
 ## News and Noteworthy
+
+v0.9.7 - 2026-11-15
+* Added the new module `kaltblut-bom` - a Bill of Materials for all published Kaltblut artifacts
+* Switched the imported ph-commons and ph-telemetry dependency management to their BOMs
 
 v0.9.6 - 2026-11-03
 * Fixed an `IndexOutOfBoundsException` in the veraPDF validation of PDFs without PDF/A identification in the XMP metadata.
