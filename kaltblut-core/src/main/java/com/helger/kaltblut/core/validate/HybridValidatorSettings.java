@@ -38,6 +38,7 @@ public final class HybridValidatorSettings
   private EZugferdFlavor m_eExpectedFlavor;
   private boolean m_bCheckPdfA3 = true;
   private boolean m_bApplyDePdfADowngrade = true;
+  private boolean m_bReadXmlContext = false;
   private HybridLimits m_aLimits = HybridLimits.DEFAULTS;
 
   /**
@@ -93,7 +94,8 @@ public final class HybridValidatorSettings
   /**
    * @return whether to apply the <code>BR-FX-DE-03</code> downgrade (PDF/A-3 fatal errors become
    *         warnings when {@link #getCountry()} is {@link EZugferdCountry#DE} and the XML is valid
-   *         / extractable). Default <code>true</code>.
+   *         / extractable). Default <code>true</code>. For an auto-detected country, the seller
+   *         must be in DE and the buyer in DE or unknown.
    */
   public boolean isApplyDePdfADowngrade ()
   {
@@ -104,6 +106,22 @@ public final class HybridValidatorSettings
   public HybridValidatorSettings setApplyDePdfADowngrade (final boolean bApplyDePdfADowngrade)
   {
     m_bApplyDePdfADowngrade = bApplyDePdfADowngrade;
+    return this;
+  }
+
+  /**
+   * @return whether to auto-detect the country from the embedded invoice XML while
+   *         {@link #getCountry()} is {@link EZugferdCountry#OTHER}. Default <code>false</code>.
+   */
+  public boolean isReadXmlContext ()
+  {
+    return m_bReadXmlContext;
+  }
+
+  @NonNull
+  public HybridValidatorSettings setReadXmlContext (final boolean bReadXmlContext)
+  {
+    m_bReadXmlContext = bReadXmlContext;
     return this;
   }
 

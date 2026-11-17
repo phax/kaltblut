@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 
 import com.helger.base.id.IHasID;
 import com.helger.base.lang.EnumHelper;
+import com.helger.base.string.StringHelper;
 
 /**
  * Country context used to gate Factur-X / ZUGFeRD country-specific business rules (BR-HYBRID-DE-*,
@@ -61,5 +62,24 @@ public enum EZugferdCountry implements IHasID <String>
                                                     @Nullable final EZugferdCountry eDefault)
   {
     return EnumHelper.getFromIDOrDefault (EZugferdCountry.class, sID, eDefault);
+  }
+
+  /**
+   * Resolve a raw ISO 3166-1 alpha-2 country code (e.g. from BT-40 Seller country or a VAT
+   * identifier prefix) to the country gate. Matching is case-insensitive and ignores surrounding
+   * whitespace. Unknown or <code>null</code> codes map to {@link #OTHER}.
+   *
+   * @param sCountryCode
+   *        the raw country code. May be <code>null</code>.
+   * @return the resolved country; never <code>null</code>.
+   */
+  @NonNull
+  public static EZugferdCountry getFromCountryCode (@Nullable final String sCountryCode)
+  {
+    final String sTrimmed = StringHelper.trim (sCountryCode);
+    // "OTHER" is the enum's own ID, not an ISO country code
+    if (StringHelper.getLength (sTrimmed) != 2)
+      return OTHER;
+    return EnumHelper.getFromIDCaseInsensitiveOrDefault (EZugferdCountry.class, sTrimmed, OTHER);
   }
 }

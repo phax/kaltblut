@@ -16,16 +16,28 @@
  */
 package com.helger.kaltblut.core.validate;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.common.PDNameTreeNode;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDComplexFileSpecification;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDEmbeddedFile;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.Test;
 
+import com.helger.base.io.nonblocking.NonBlockingByteArrayInputStream;
+import com.helger.base.io.nonblocking.NonBlockingByteArrayOutputStream;
+import com.helger.base.io.stream.StreamHelper;
 import com.helger.kaltblut.core.model.EZugferdCountry;
 import com.helger.kaltblut.core.source.HybridSource;
 import com.helger.kaltblut.testfiles.KaltblutTestFiles;
@@ -66,6 +78,77 @@ public final class HybridValidatorTest
                         "173\n" +
                         "%%EOF\n";
     return sPdf.getBytes (StandardCharsets.US_ASCII);
+  }
+
+  private static void _rewriteEmbeddedXml (@NonNull final PDDocument aDoc,
+                                           @NonNull final PDNameTreeNode <PDComplexFileSpecification> aNode,
+                                           @Nullable final String sSellerVat,
+                                           @Nullable final String sBuyerCountry,
+                                           @Nullable final String sAFRelationship) throws IOException
+  {
+    if (aNode.getKids () != null)
+      for (final PDNameTreeNode <PDComplexFileSpecification> aKid : aNode.getKids ())
+        _rewriteEmbeddedXml (aDoc, aKid, sSellerVat, sBuyerCountry, sAFRelationship);
+    if (aNode.getNames () == null)
+      return;
+    for (final Map.Entry <String, PDComplexFileSpecification> aEntry : aNode.getNames ().entrySet ())
+    {
+      final PDComplexFileSpecification aSpec = aEntry.getValue ();
+      final PDEmbeddedFile aOld = aSpec.getEmbeddedFileUnicode () != null ? aSpec.getEmbeddedFileUnicode ()
+                                                                          : aSpec.getEmbeddedFile ();
+      String sXml = new String (StreamHelper.getAllBytes (aOld.createInputStream ()), StandardCharsets.UTF_8);
+      if (sSellerVat != null)
+        sXml = sXml.replace (">DE123456789<", ">" + sSellerVat + "<");
+      if (sBuyerCountry != null)
+      {
+        final int nBuyer = sXml.indexOf ("<ram:BuyerTradeParty>");
+        final int nCountry = sXml.indexOf ("<ram:CountryID>DE</ram:CountryID>", nBuyer);
+        sXml = sXml.substring (0, nCountry) +
+               "<ram:CountryID>" +
+               sBuyerCountry +
+               "</ram:CountryID>" +
+               sXml.substring (nCountry + "<ram:CountryID>DE</ram:CountryID>".length ());
+      }
+      final PDEmbeddedFile aNew = new PDEmbeddedFile (aDoc,
+                                                      new NonBlockingByteArrayInputStream (sXml.getBytes (StandardCharsets.UTF_8)));
+      aNew.setSubtype (aOld.getSubtype ());
+      aSpec.setEmbeddedFile (aNew);
+      aSpec.setEmbeddedFileUnicode (aNew);
+      if (sAFRelationship != null)
+        aSpec.getCOSObject ().setName (COSName.getPDFName ("AFRelationship"), sAFRelationship);
+    }
+  }
+
+  /**
+   * Copy a sample and rewrite its embedded invoice XML (seller VAT ID, buyer postal country) and
+   * /AFRelationship. The samples all have seller VAT DE123456789 and a DE buyer. An empty buyer
+   * country makes the buyer country unknown.
+   */
+  @NonNull
+  private static byte [] _sampleWith (@NonNull final String sClasspath,
+                                      @Nullable final String sSellerVat,
+                                      @Nullable final String sBuyerCountry,
+                                      @Nullable final String sAFRelationship) throws IOException
+  {
+    try (final PDDocument aDoc = Loader.loadPDF (HybridSource.fromClasspath (sClasspath).getBytes ());
+         final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
+    {
+      _rewriteEmbeddedXml (aDoc,
+                           aDoc.getDocumentCatalog ().getNames ().getEmbeddedFiles (),
+                           sSellerVat,
+                           sBuyerCountry,
+                           sAFRelationship);
+      aDoc.save (aBAOS);
+      return aBAOS.toByteArray ();
+    }
+  }
+
+  @NonNull
+  private static HybridValidationResult _validateAuto (@NonNull final byte [] aPdf) throws IOException
+  {
+    final HybridValidator v = _newValidator (EZugferdCountry.OTHER);
+    v.getSettings ().setReadXmlContext (true);
+    return v.validate (HybridSource.fromBytes (aPdf));
   }
 
   @Test
@@ -128,6 +211,119 @@ public final class HybridValidatorTest
     final HybridFinding aF = aRes.findByRuleID ("BR-HYBRID-10");
     assertNotNull ("BR-HYBRID-10 must be reported when fx:Version != 1.0", aF);
     assertTrue (aF.getSeverity () == EHybridSeverity.WARNING);
+  }
+
+  @Test
+  public void testReadXmlContext_AutoCountryDE () throws IOException
+  {
+    // Country is OTHER, so the seller country DE is taken from the embedded XML
+    final HybridValidator v = _newValidator (EZugferdCountry.OTHER);
+    v.getSettings ().setReadXmlContext (true);
+    final HybridValidationResult aRes = v.validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_3_MINIMUM));
+    assertTrue ("BR-HYBRID-DE-01 must fire for auto-detected DE", aRes.hasErrorRule ("BR-HYBRID-DE-01"));
+    final HybridFinding aF = aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO");
+    assertNotNull ("Auto-detected country must be reported", aF);
+    assertEquals (EHybridSeverity.INFORMATION, aF.getSeverity ());
+    // The MINIMUM sample has no buyer country
+    assertTrue (aF.getMessage ().contains ("treated as DE"));
+  }
+
+  @Test
+  public void testReadXmlContext_DisabledByDefault () throws IOException
+  {
+    // Carrier-only default path: the XML is not consulted, so the DE rules don't fire
+    final HybridValidator v = _newValidator (EZugferdCountry.OTHER);
+    assertFalse (v.getSettings ().isReadXmlContext ());
+    final HybridValidationResult aRes = v.validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_3_MINIMUM));
+    assertFalse (aRes.hasRule ("BR-HYBRID-DE-01"));
+    assertFalse (aRes.hasRule ("KALTBLUT-COUNTRY-AUTO"));
+  }
+
+  @Test
+  public void testReadXmlContext_ExplicitCountryWins () throws IOException
+  {
+    // The XML says DE, but the explicitly configured FR takes precedence
+    final HybridValidator v = _newValidator (EZugferdCountry.FR);
+    v.getSettings ().setReadXmlContext (true);
+    final HybridValidationResult aRes = v.validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_3_MINIMUM));
+    assertFalse (aRes.hasRule ("BR-HYBRID-DE-01"));
+    assertFalse (aRes.hasRule ("KALTBLUT-COUNTRY-AUTO"));
+  }
+
+  @Test
+  public void testReadXmlContext_NonHybridPdf () throws IOException
+  {
+    // No invoice XML: the country stays OTHER, which is reported, and validation continues normally
+    final HybridValidator v = _newValidator (EZugferdCountry.OTHER);
+    v.getSettings ().setReadXmlContext (true);
+    final HybridValidationResult aRes = v.validate (HybridSource.fromBytes (_pdfWithoutInvoiceXml ()));
+    assertTrue (aRes.hasErrorRule ("BR-HYBRID-03"));
+    final HybridFinding aF = aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO");
+    assertNotNull ("Failed auto-detection must be reported", aF);
+    assertTrue (aF.getMessage ().contains ("could not be read"));
+  }
+
+  @Test
+  public void testReadXmlContext_DeProfileRulesFollowBuyer () throws IOException
+  {
+    // DE↔DE: the specification rule BR-HYBRID-DE-02 applies
+    HybridValidationResult aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_4_BASIC_WL, null, "DE", null));
+    assertTrue (aRes.hasErrorRule ("BR-HYBRID-DE-02"));
+    assertFalse (aRes.hasRule ("KALTBLUT-DE-02"));
+    // DE to another EN 16931 country: only the KALTBLUT-DE-02 warning
+    for (final String sBuyer : new String [] { "FR", "AT", "NO", "CH", "GB" })
+    {
+      aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_4_BASIC_WL, null, sBuyer, null));
+      assertFalse (sBuyer, aRes.hasRule ("BR-HYBRID-DE-02"));
+      final HybridFinding aF = aRes.findByRuleID ("KALTBLUT-DE-02");
+      assertNotNull (sBuyer, aF);
+      assertEquals (EHybridSeverity.WARNING, aF.getSeverity ());
+    }
+    // DE to a non-EN 16931 country: neither
+    aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_4_BASIC_WL, null, "US", null));
+    assertFalse (aRes.hasRule ("BR-HYBRID-DE-02"));
+    assertFalse (aRes.hasRule ("KALTBLUT-DE-02"));
+    assertTrue (aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO").getMessage ().contains ("buyer is not in DE"));
+  }
+
+  @Test
+  public void testReadXmlContext_DeAfMatrixRequiresDomestic () throws IOException
+  {
+    // EN 16931 with /AFRelationship Data: the DE matrix (expects Alternative) only applies DE↔DE
+    assertTrue (_validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_0_1_EN16931, null, null, "Data")).hasRule (
+                                                                                                              "BR-HYBRID-11"));
+    assertFalse (_validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_0_1_EN16931, null, "FR", "Data")).hasRule (
+                                                                                                               "BR-HYBRID-11"));
+  }
+
+  @Test
+  public void testReadXmlContext_FrRulesRequireDomestic () throws IOException
+  {
+    // FR seller with XRECHNUNG: BR-HYBRID-FR-01 only applies FR↔FR
+    assertTrue (_validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_2_XRECHNUNG, "FR12345678901", "FR", null))
+                                                                                                             .hasErrorRule ("BR-HYBRID-FR-01"));
+    final HybridValidationResult aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_2_XRECHNUNG,
+                                                                    "FR12345678901",
+                                                                    null,
+                                                                    null));
+    assertFalse (aRes.hasRule ("BR-HYBRID-FR-01"));
+    assertTrue (aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO").getMessage ().contains ("buyer is not in FR"));
+    // An unknown buyer (empty country) counts as FR
+    final HybridValidationResult aResUnknown = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_2_XRECHNUNG,
+                                                                           "FR12345678901",
+                                                                           "",
+                                                                           null));
+    assertTrue (aResUnknown.hasErrorRule ("BR-HYBRID-FR-01"));
+    assertTrue (aResUnknown.findByRuleID ("KALTBLUT-COUNTRY-AUTO").getMessage ().contains ("treated as FR"));
+  }
+
+  @Test
+  public void testReadXmlContext_SellerNotDeOrFr () throws IOException
+  {
+    // Readable XML, but the seller is neither in DE nor in FR
+    final HybridFinding aF = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_0_1_EN16931, "ATU12345678", null, null))
+                                                                                                                        .findByRuleID ("KALTBLUT-COUNTRY-AUTO");
+    assertTrue (aF.getMessage ().startsWith ("No DE or FR"));
   }
 
   @Test

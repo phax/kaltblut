@@ -1,6 +1,6 @@
 # Proposal: `HybridXmlContext` — read routing-relevant identifiers from the embedded invoice XML
 
-- **Status:** proposal / not yet implemented
+- **Status:** partially implemented (auto-country); BR-HYBRID-15 still open
 - **Date:** 2026-08-02
 - **Origin:** phorm discussion [#19](https://github.com/phax/phorm/discussions/19) ("National rule layers
   can't be reached when BT-24 only declares the format") + the EN 16931 BT-24 requirement.
@@ -61,9 +61,9 @@ router such as phorm gets the exact composite key discussion #19 needs, without 
 re-parsing the XML itself. Clean division of labour: kaltblut extracts routing context; phive/phorm does
 the layered rule selection.
 
-## 3. Country resolution — mirror PEPPOL, not just the postal address
+## 3. Country resolution — mirror Peppol, not just the postal address
 
-A background analysis of `openpeppol/2026.5/PEPPOL-EN16931-UBL.sch` shows PEPPOL does **not** derive the
+A background analysis of `openpeppol/2026.5/PEPPOL-EN16931-UBL.sch` shows Peppol does **not** derive the
 seller country from the postal address alone. Its `supplierCountry` `<let>` uses a priority chain and
 treats the **VAT-registration country as authoritative over the postal address**:
 
@@ -72,7 +72,7 @@ treats the **VAT-registration country as authoritative over the postal address**
 3. else `PostalAddress/Country/IdentificationCode`
 4. else `'XX'`
 
-This matters: a seller can be postally in one country but VAT-registered in another, and PEPPOL's
+This matters: a seller can be postally in one country but VAT-registered in another, and Peppol's
 national rules key off the VAT country. If kaltblut resolved jurisdiction from postal country only, its
 auto-detected country could disagree with the layer that actually applies — reintroducing the exact
 mismatch we are trying to close. **`getResolvedCountry()` must therefore apply the VAT-prefix-first
@@ -176,7 +176,7 @@ public final class HybridXmlContext
     return m_sSellerPostalCountryCode;
   }
 
-  /** @return the jurisdiction resolved via the PEPPOL VAT-prefix-first chain; never
+  /** @return the jurisdiction resolved via the Peppol VAT-prefix-first chain; never
    *          <code>null</code> ({@link EZugferdCountry#OTHER} when absent/unmapped). */
   @NonNull
   public EZugferdCountry getResolvedCountry ()
@@ -403,7 +403,7 @@ public final class HybridXmlContextReader
     return sTrimmed.length () >= 2 ? sTrimmed.substring (0, 2) : null;
   }
 
-  /** @return the resolved country using the PEPPOL VAT-prefix-first chain. */
+  /** @return the resolved country using the Peppol VAT-prefix-first chain. */
   @NonNull
   private static EZugferdCountry _resolve (@Nullable final String sSellerVat,
                                            @Nullable final String sTaxRepVat,
@@ -593,6 +593,7 @@ Checked against local sources under `~/dev/git/ph-commons`:
    `setReadXmlContext (true)` for a German invoice would auto-relax PDF/A severity — behaviour that today
    requires an explicit `setCountry (DE)`. Decide: is that acceptable, or should auto-detected DE gate
    the country rule layers **but not** the PDF/A downgrade?
+   **Resolved:** the downgrade applies to an auto-detected DE only if the buyer is in DE too (DE↔DE) or unknown.
 
 ### 6c. Verify against real sample files (implementation-time confirmation)
 
@@ -600,8 +601,8 @@ Checked against local sources under `~/dev/git/ph-commons`:
    with `@schemeID='VA'` in real Factur-X/ZUGFeRD 2.x files (vs. `'VAT'` or absent).
 7. **CII tax representative element name** — confirm `ram:SellerTaxRepresentativeTradeParty` under
    `ram:ApplicableHeaderTradeAgreement`.
-8. **UBL VAT** — confirm PEPPOL/XRechnung UBL uses `PartyTaxScheme[TaxScheme/ID='VAT']/CompanyID` for the
-   seller VAT (this matches the PEPPOL Schematron `supplierCountry` derivation).
+8. **UBL VAT** — confirm Peppol/XRechnung UBL uses `PartyTaxScheme[TaxScheme/ID='VAT']/CompanyID` for the
+   seller VAT (this matches the Peppol Schematron `supplierCountry` derivation).
 
 ### 6d. Resolved
 

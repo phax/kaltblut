@@ -44,7 +44,8 @@ public final class ValidateCommand implements Callable <Integer>
 
   @Option (names = { "-c", "--country" },
            description = "Country context for country-specific rules: ${COMPLETION-CANDIDATES} (default: OTHER).")
-  private EZugferdCountry m_eCountry = EZugferdCountry.OTHER;
+  // null = not given, so that an explicit OTHER can be told apart
+  private EZugferdCountry m_eCountry;
 
   @Option (names = { "--no-pdfa" }, description = "Skip PDF/A-3 validation via the IPdfA3Validator SPI.")
   private boolean m_bNoPdfA;
@@ -52,6 +53,10 @@ public final class ValidateCommand implements Callable <Integer>
   @Option (names = { "--no-de-pdfa-downgrade" },
            description = "Disable BR-FX-DE-03 PDF/A-3 error downgrade for DE↔DE invoices.")
   private boolean m_bNoDeDowngrade;
+
+  @Option (names = { "--read-xml-context" },
+           description = "Without --country, take the country from the embedded invoice XML. Ignored if --country is set.")
+  private boolean m_bReadXmlContext;
 
   @Parameters (paramLabel = "PDF", description = "One or more PDF files to validate", arity = "1..*")
   private List <String> m_aFiles;
@@ -70,6 +75,8 @@ public final class ValidateCommand implements Callable <Integer>
     int nWarn = 0;
     int nInfo = 0;
     int nErrorFiles = 0;
+    if (m_bReadXmlContext && m_eCountry != null)
+      LOGGER.warn ("--read-xml-context is ignored because --country " + m_eCountry.getID () + " is set");
     for (final String sPath : m_aFiles)
     {
       final File aFile = new File (sPath).getAbsoluteFile ();
@@ -83,9 +90,10 @@ public final class ValidateCommand implements Callable <Integer>
       {
         final IHybridSource aSource = HybridSource.fromFile (aFile);
         final HybridValidator aValidator = new HybridValidator ();
-        aValidator.getSettings ().setCountry (m_eCountry);
+        aValidator.getSettings ().setCountry (m_eCountry != null ? m_eCountry : EZugferdCountry.OTHER);
         aValidator.getSettings ().setCheckPdfA3 (!m_bNoPdfA);
         aValidator.getSettings ().setApplyDePdfADowngrade (!m_bNoDeDowngrade);
+        aValidator.getSettings ().setReadXmlContext (m_bReadXmlContext && m_eCountry == null);
         final HybridValidationResult aRes = aValidator.validate (aSource);
         System.out.println ("File: " + aFile.getName () + "  (" + aRes.getFindingCount () + " finding(s))");
         for (final HybridValidationLayer aLayer : aRes.getAllLayers ())

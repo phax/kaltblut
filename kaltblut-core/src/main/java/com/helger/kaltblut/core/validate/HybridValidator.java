@@ -29,13 +29,17 @@ import com.helger.annotation.concurrent.NotThreadSafe;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.timing.StopWatch;
 import com.helger.collection.commons.CommonsArrayList;
+import com.helger.collection.commons.CommonsHashSet;
 import com.helger.collection.commons.ICommonsList;
+import com.helger.collection.commons.ICommonsSet;
+import com.helger.kaltblut.core.inspect.HybridXmlContextReader;
 import com.helger.kaltblut.core.model.EAFRelationship;
 import com.helger.kaltblut.core.model.EZugferdCountry;
 import com.helger.kaltblut.core.model.EZugferdFlavor;
 import com.helger.kaltblut.core.model.EZugferdProfile;
 import com.helger.kaltblut.core.model.HybridAttachment;
 import com.helger.kaltblut.core.model.HybridMetadata;
+import com.helger.kaltblut.core.model.HybridXmlContext;
 import com.helger.kaltblut.core.pdfbox.HybridDocument;
 import com.helger.kaltblut.core.source.IHybridSource;
 import com.helger.telemetry.ETelemetrySpanKind;
@@ -62,6 +66,45 @@ public final class HybridValidator
   private static final String FN_ZUGFERD_MIXED = "ZUGFeRD-invoice.xml";
 
   private static final Logger LOGGER = LoggerFactory.getLogger (HybridValidator.class);
+
+  /**
+   * Buyer countries other than DE for which an auto-detected DE seller triggers KALTBLUT-DE-01/02:
+   * the rest of the EU (incl. the VIES prefixes EL and XI), the EEA and the further EN 16931
+   * adopters CH and GB.
+   */
+  private static final ICommonsSet <String> EN16931_COUNTRIES = new CommonsHashSet <> ("AT",
+                                                                                       "BE",
+                                                                                       "BG",
+                                                                                       "CY",
+                                                                                       "CZ",
+                                                                                       "DK",
+                                                                                       "EE",
+                                                                                       "EL",
+                                                                                       "ES",
+                                                                                       "FI",
+                                                                                       "FR",
+                                                                                       "GR",
+                                                                                       "HR",
+                                                                                       "HU",
+                                                                                       "IE",
+                                                                                       "IT",
+                                                                                       "LT",
+                                                                                       "LU",
+                                                                                       "LV",
+                                                                                       "MT",
+                                                                                       "NL",
+                                                                                       "PL",
+                                                                                       "PT",
+                                                                                       "RO",
+                                                                                       "SE",
+                                                                                       "SI",
+                                                                                       "SK",
+                                                                                       "XI",
+                                                                                       "IS",
+                                                                                       "LI",
+                                                                                       "NO",
+                                                                                       "CH",
+                                                                                       "GB");
 
   private final HybridValidatorSettings m_aSettings = new HybridValidatorSettings ();
 
@@ -97,8 +140,10 @@ public final class HybridValidator
       // Layer 1: BR-HYBRID business rules
       final ICommonsList <HybridFinding> aBrHybridFindings = new CommonsArrayList <> ();
       boolean bXmlExtractable = false;
+      boolean bDomesticDE = m_aSettings.getCountry () == EZugferdCountry.DE;
       final StopWatch aSwBrHybrid = StopWatch.createdStarted ();
-      // Manual span (not withSpan) so that bXmlExtractable can escape to the PDF/A downgrade logic.
+      // Manual span (not withSpan) so that bXmlExtractable and bDomesticDE can escape to the PDF/A
+      // downgrade logic.
       // The nested source.read / pdf.open / xmp.parse / attachments spans attach under this one.
       try (final ITelemetrySpan aSpanBr = Telemetry.startSpan ("kaltblut.validate.brhybrid",
                                                                ETelemetrySpanKind.INTERNAL))
@@ -107,13 +152,63 @@ public final class HybridValidator
         {
           final HybridMetadata aMeta = aDoc.readMetadata ();
           final ICommonsList <HybridAttachment> aAttachments = aDoc.listAttachments ();
+          HybridAttachment aInvoiceXml = null;
           for (final HybridAttachment aAtt : aAttachments)
             if (aAtt.isInvoiceXml () && aAtt.getSize () > 0)
             {
-              bXmlExtractable = true;
+              aInvoiceXml = aAtt;
               break;
             }
-          _applyBrHybrid (aBrHybridFindings, aMeta);
+          bXmlExtractable = aInvoiceXml != null;
+
+          final HybridXmlContext aCtx = _readXmlContext (aInvoiceXml);
+          EZugferdCountry eCountry = m_aSettings.getCountry ();
+          boolean bDeCrossBorder = false;
+          if (aCtx != null)
+          {
+            final EZugferdCountry eSeller = aCtx.getResolvedCountry ();
+            final EZugferdCountry eBuyer = aCtx.getResolvedBuyerCountry ();
+            // An unknown buyer counts as domestic.
+            // An explicit country never knows the buyer either.
+            final String sBuyerCountry = aCtx.getBuyerCountryCode ();
+            final boolean bBuyerUnknown = sBuyerCountry == null;
+            final boolean bDomestic = eSeller != EZugferdCountry.OTHER && (bBuyerUnknown || eBuyer == eSeller);
+            // The country rules only apply domestically (DE↔DE, FR↔FR)
+            eCountry = bDomestic ? eSeller : EZugferdCountry.OTHER;
+            bDomesticDE = bDomestic && eSeller == EZugferdCountry.DE;
+            bDeCrossBorder = eSeller == EZugferdCountry.DE &&
+                             !bBuyerUnknown &&
+                             EN16931_COUNTRIES.contains (sBuyerCountry);
+            String sMsg;
+            if (aCtx.getSyntax () == null)
+              sMsg = "The embedded invoice XML could not be read for country auto-detection (missing, unparsable or unsupported syntax).";
+            else
+              if (eSeller == EZugferdCountry.OTHER)
+                sMsg = "No DE or FR seller country was auto-detected from the embedded invoice XML.";
+              else
+              {
+                final String sSeller = eSeller.getID ();
+                sMsg = "Country '" + sSeller + "' was auto-detected from the embedded invoice XML.";
+                if (bBuyerUnknown)
+                  sMsg += " The buyer country is unknown and treated as " + sSeller + ".";
+                else
+                  if (!bDomestic)
+                    sMsg += " The " +
+                            sSeller +
+                            "↔" +
+                            sSeller +
+                            " rules are skipped because the buyer is not in " +
+                            sSeller +
+                            ".";
+              }
+            aBrHybridFindings.add (new HybridFinding ("KALTBLUT-COUNTRY-AUTO",
+                                                      EHybridSeverity.INFORMATION,
+                                                      sMsg,
+                                                      null));
+          }
+          aSpanValidate.setAttribute ("kaltblut.country.effective", eCountry.getID ());
+          aSpanBr.setAttribute ("kaltblut.country.effective", eCountry.getID ());
+          _applyBrHybrid (aBrHybridFindings, aMeta, eCountry, bDeCrossBorder, bDomesticDE);
         }
         aSpanBr.setAttribute ("kaltblut.findings.count", aBrHybridFindings.size ());
         aSpanBr.setStatusOk ();
@@ -129,8 +224,9 @@ public final class HybridValidator
         final StopWatch aSwPdfA = StopWatch.createdStarted ();
         ICommonsList <HybridFinding> aPdfAFindings = _runPdfA3 (aSource);
         // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
+        // An auto-detected DE requires both seller and buyer to be in DE.
         if (m_aSettings.isApplyDePdfADowngrade () &&
-            m_aSettings.getCountry () == EZugferdCountry.DE &&
+            bDomesticDE &&
             bXmlExtractable &&
             aPdfAFindings != null &&
             !aPdfAFindings.isEmpty ())
@@ -155,9 +251,36 @@ public final class HybridValidator
     });
   }
 
+  // ===================== Country resolution =====================
+
+  /**
+   * Read the XML context, if enabled and no country is configured.
+   *
+   * @param aInvoiceXml
+   *        the invoice XML attachment of the already opened document. May be <code>null</code>.
+   * @return the context, or <code>null</code> if it is not used.
+   */
+  @Nullable
+  private HybridXmlContext _readXmlContext (@Nullable final HybridAttachment aInvoiceXml)
+  {
+    if (m_aSettings.getCountry () != EZugferdCountry.OTHER || !m_aSettings.isReadXmlContext ())
+      return null;
+
+    // Reuse the bytes of the already opened document - don't re-open the PDF
+    final HybridXmlContext aCtx = aInvoiceXml == null ? HybridXmlContext.EMPTY
+                                                      : HybridXmlContextReader.readXmlContext (aInvoiceXml);
+    if (LOGGER.isDebugEnabled ())
+      LOGGER.debug ("Resolved XML context " + aCtx);
+    return aCtx;
+  }
+
   // ===================== BR-HYBRID rules =====================
 
-  private void _applyBrHybrid (@NonNull final ICommonsList <HybridFinding> aOut, @NonNull final HybridMetadata aMeta)
+  private static void _applyBrHybrid (@NonNull final ICommonsList <HybridFinding> aOut,
+                                      @NonNull final HybridMetadata aMeta,
+                                      @NonNull final EZugferdCountry eCountry,
+                                      final boolean bDeCrossBorder,
+                                      final boolean bDomesticDE)
   {
     final EZugferdFlavor eFlavor = aMeta.getFlavor ();
 
@@ -270,7 +393,7 @@ public final class HybridValidator
     else
       if (eProfile != null && eRel != null)
       {
-        final HybridFinding aRel = _checkAfRelationshipMatrix (eProfile, eRel, m_aSettings.getCountry ());
+        final HybridFinding aRel = _checkAfRelationshipMatrix (eProfile, eRel, eCountry, bDomesticDE);
         if (aRel != null)
           aOut.add (aRel);
       }
@@ -317,7 +440,7 @@ public final class HybridValidator
                                    "/Metadata"));
 
     // BR-HYBRID-DE-01 / DE-02 (Fatal): MINIMUM and BASIC WL must not be used DE↔DE.
-    if (m_aSettings.getCountry () == EZugferdCountry.DE)
+    if (bDomesticDE)
     {
       if (eProfile == EZugferdProfile.MINIMUM)
         aOut.add (new HybridFinding ("BR-HYBRID-DE-01",
@@ -330,8 +453,23 @@ public final class HybridValidator
                                      "BASIC WL profile is not permitted for DE↔DE invoices.",
                                      null));
     }
+    // KALTBLUT-DE-01 / DE-02 (Warning, not part of the specification): the same for an auto-
+    // detected DE seller with a buyer in another EN 16931 country.
+    if (bDeCrossBorder)
+    {
+      if (eProfile == EZugferdProfile.MINIMUM)
+        aOut.add (new HybridFinding ("KALTBLUT-DE-01",
+                                     EHybridSeverity.WARNING,
+                                     "MINIMUM profile should not be used for DE to EU/EEA/CH/UK invoices.",
+                                     null));
+      if (eProfile == EZugferdProfile.BASIC_WL)
+        aOut.add (new HybridFinding ("KALTBLUT-DE-02",
+                                     EHybridSeverity.WARNING,
+                                     "BASIC WL profile should not be used for DE to EU/EEA/CH/UK invoices.",
+                                     null));
+    }
     // BR-HYBRID-FR-01 (Fatal): XRECHNUNG must not be used FR↔FR.
-    if (m_aSettings.getCountry () == EZugferdCountry.FR && eProfile == EZugferdProfile.XRECHNUNG)
+    if (eCountry == EZugferdCountry.FR && eProfile == EZugferdProfile.XRECHNUNG)
       aOut.add (new HybridFinding ("BR-HYBRID-FR-01",
                                    EHybridSeverity.ERROR,
                                    "XRECHNUNG reference profile is not permitted for FR↔FR invoices.",
@@ -349,7 +487,8 @@ public final class HybridValidator
   @Nullable
   private static HybridFinding _checkAfRelationshipMatrix (@NonNull final EZugferdProfile eProfile,
                                                            @NonNull final EAFRelationship eRel,
-                                                           @NonNull final EZugferdCountry eCountry)
+                                                           @NonNull final EZugferdCountry eCountry,
+                                                           final boolean bDomesticDE)
   {
     if (eProfile == EZugferdProfile.MINIMUM || eProfile == EZugferdProfile.BASIC_WL)
     {
@@ -366,7 +505,7 @@ public final class HybridValidator
       return null;
     }
     // For BASIC, EN 16931, EXTENDED, COMFORT, XRECHNUNG
-    if (eCountry == EZugferdCountry.DE)
+    if (bDomesticDE)
     {
       if (eRel != EAFRelationship.ALTERNATIVE)
         return new HybridFinding ("BR-HYBRID-11",
