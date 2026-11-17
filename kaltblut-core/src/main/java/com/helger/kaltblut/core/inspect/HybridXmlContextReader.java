@@ -20,19 +20,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
 
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
 
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.base.codec.RFC5234Helper;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.io.nonblocking.NonBlockingByteArrayInputStream;
 import com.helger.base.string.StringHelper;
+import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.CommonsHashSet;
+import com.helger.collection.commons.ICommonsList;
 import com.helger.collection.commons.ICommonsSet;
 import com.helger.kaltblut.core.model.EZugferdCountry;
 import com.helger.kaltblut.core.model.HybridAttachment;
@@ -43,11 +48,6 @@ import com.helger.kaltblut.core.source.IHybridSource;
 import com.helger.telemetry.ETelemetrySpanKind;
 import com.helger.telemetry.ITelemetrySpan;
 import com.helger.telemetry.Telemetry;
-import com.helger.xml.EXMLParserFeature;
-import com.helger.xml.XMLHelper;
-import com.helger.xml.sax.DoNothingSAXErrorHandler;
-import com.helger.xml.serialize.read.DOMReader;
-import com.helger.xml.serialize.read.DOMReaderSettings;
 
 /**
  * Optional reader that peeks into the embedded invoice XML for the few routing-relevant context
@@ -84,21 +84,15 @@ public final class HybridXmlContextReader
   /** Upper bound for identifier values copied into span attributes. */
   private static final int MAX_SPAN_ATTR_LENGTH = 256;
 
-  // Untrusted payload: harden against XXE / DTD / entity expansion. DOMReaderDefaultSettings does
-  // not disable DTDs by default, so this must be explicit.
-  private static final DOMReaderSettings XML_SETTINGS = new DOMReaderSettings ();
+  // Untrusted payload: no DTDs (a DOCTYPE is rejected below) and no external entities. The JDK
+  // default implementation is used, independent of any StAX provider on the classpath.
+  private static final XMLInputFactory XML_INPUT_FACTORY = XMLInputFactory.newDefaultFactory ();
 
   static
   {
-    XML_SETTINGS.setFeatureValue (EXMLParserFeature.SECURE_PROCESSING, true)
-                .setFeatureValue (EXMLParserFeature.DISALLOW_DOCTYPE_DECL, true)
-                .setFeatureValue (EXMLParserFeature.EXTERNAL_GENERAL_ENTITIES, false)
-                .setFeatureValue (EXMLParserFeature.EXTERNAL_PARAMETER_ENTITIES, false)
-                .setFeatureValue (EXMLParserFeature.LOAD_EXTERNAL_DTD, false)
-                // Malformed XML is an expected, handled case: log it once below, not here
-                .setErrorHandler (new DoNothingSAXErrorHandler ());
-    XML_SETTINGS.exceptionCallbacks ()
-                .set (ex -> LOGGER.debug ("Embedded invoice XML is not parsable: " + ex.getMessage ()));
+    XML_INPUT_FACTORY.setProperty (XMLInputFactory.IS_NAMESPACE_AWARE, Boolean.TRUE);
+    XML_INPUT_FACTORY.setProperty (XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
+    XML_INPUT_FACTORY.setProperty (XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
   }
 
   private HybridXmlContextReader ()
@@ -207,38 +201,50 @@ public final class HybridXmlContextReader
   @NonNull
   private static HybridXmlContext _parse (@NonNull final InputStream aXmlIS)
   {
-    final Document aDoc = DOMReader.readXMLDOM (aXmlIS, XML_SETTINGS);
-    if (aDoc == null)
+    XMLStreamReader aReader = null;
+    try
     {
-      LOGGER.warn ("Failed to parse the embedded invoice XML for context extraction");
+      aReader = XML_INPUT_FACTORY.createXMLStreamReader (aXmlIS);
+      while (aReader.hasNext ())
+      {
+        final int nEvent = aReader.next ();
+        if (nEvent == XMLStreamConstants.DTD)
+        {
+          LOGGER.warn ("The embedded invoice XML contains a DOCTYPE, which is not allowed");
+          return HybridXmlContext.EMPTY;
+        }
+        if (nEvent == XMLStreamConstants.START_ELEMENT)
+        {
+          final String sNS = aReader.getNamespaceURI ();
+          final String sLocal = aReader.getLocalName ();
+          if (CII_NS_RSM.equals (sNS) && "CrossIndustryInvoice".equals (sLocal))
+            return new ContextCollector (true).collect (aReader);
+          if ((UBL_NS_INVOICE.equals (sNS) && "Invoice".equals (sLocal)) ||
+              (UBL_NS_CREDITNOTE.equals (sNS) && "CreditNote".equals (sLocal)))
+            return new ContextCollector (false).collect (aReader);
+          return HybridXmlContext.EMPTY;
+        }
+      }
       return HybridXmlContext.EMPTY;
     }
-    final Element eRoot = aDoc.getDocumentElement ();
-    final String sNS = eRoot == null ? null : eRoot.getNamespaceURI ();
-    final String sLocal = eRoot == null ? null : eRoot.getLocalName ();
-    if (CII_NS_RSM.equals (sNS) && "CrossIndustryInvoice".equals (sLocal))
-      return _fromCII (eRoot);
-    if ((UBL_NS_INVOICE.equals (sNS) && "Invoice".equals (sLocal)) ||
-        (UBL_NS_CREDITNOTE.equals (sNS) && "CreditNote".equals (sLocal)))
-      return _fromUBL (eRoot);
-    return HybridXmlContext.EMPTY;
-  }
-
-  @Nullable
-  private static Element _child (@Nullable final Element aParent,
-                                 @NonNull final String sNamespaceURI,
-                                 @NonNull final String sLocalName)
-  {
-    return aParent == null ? null : XMLHelper.getFirstChildElementOfName (aParent, sNamespaceURI, sLocalName);
-  }
-
-  @Nullable
-  private static String _text (@Nullable final Element aElement)
-  {
-    if (aElement == null)
-      return null;
-    final String sTrimmed = StringHelper.trim (aElement.getTextContent ());
-    return StringHelper.isNotEmpty (sTrimmed) ? sTrimmed : null;
+    catch (final XMLStreamException ex)
+    {
+      LOGGER.warn ("Failed to parse the embedded invoice XML for context extraction");
+      LOGGER.debug ("Embedded invoice XML is not parsable: " + ex.getMessage ());
+      return HybridXmlContext.EMPTY;
+    }
+    finally
+    {
+      if (aReader != null)
+        try
+        {
+          aReader.close ();
+        }
+        catch (final XMLStreamException ex)
+        {
+          // ignore
+        }
+    }
   }
 
   /**
@@ -304,99 +310,294 @@ public final class HybridXmlContextReader
                                  _resolve (sBuyerVatCountry, null, sBuyerPostalCountry));
   }
 
-  @NonNull
-  private static HybridXmlContext _fromCII (@NonNull final Element eRoot)
+  private static final int PARTY_SELLER = 0;
+  private static final int PARTY_TAX_REP = 1;
+  private static final int PARTY_BUYER = 2;
+
+  // Paths are relative to the root element; segments are "<ns-token>:<local name>"
+  private static final String CII_GUIDELINE_ID = "rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID";
+  private static final String CII_PROCESS_ID = "rsm:ExchangedDocumentContext/ram:BusinessProcessSpecifiedDocumentContextParameter/ram:ID";
+  private static final String CII_AGREEMENT = "rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement";
+  private static final String [] CII_PARTIES = { CII_AGREEMENT + "/ram:SellerTradeParty",
+                                                 CII_AGREEMENT + "/ram:SellerTaxRepresentativeTradeParty",
+                                                 CII_AGREEMENT + "/ram:BuyerTradeParty" };
+  private static final String CII_VAT_ID = "/ram:SpecifiedTaxRegistration/ram:ID";
+  private static final String CII_POSTAL_COUNTRY = "/ram:PostalTradeAddress/ram:CountryID";
+
+  private static final String UBL_CUSTOMIZATION_ID = "cbc:CustomizationID";
+  private static final String UBL_PROFILE_ID = "cbc:ProfileID";
+  private static final String [] UBL_PARTIES = { "cac:AccountingSupplierParty/cac:Party",
+                                                 "cac:TaxRepresentativeParty",
+                                                 "cac:AccountingCustomerParty/cac:Party" };
+  private static final String UBL_TAX_SCHEME = "/cac:PartyTaxScheme";
+  private static final String UBL_COMPANY_ID = UBL_TAX_SCHEME + "/cbc:CompanyID";
+  private static final String UBL_TAX_SCHEME_ID = UBL_TAX_SCHEME + "/cac:TaxScheme/cbc:ID";
+  private static final String UBL_POSTAL_COUNTRY = "/cac:PostalAddress/cac:Country/cbc:IdentificationCode";
+
+  /** Elements that may repeat: every occurrence is inspected, not only the first one. */
+  private static final ICommonsSet <String> REPEATABLE = new CommonsHashSet <> ("ram:SpecifiedTaxRegistration",
+                                                                                "cac:PartyTaxScheme");
+
+  private static final ICommonsSet <String> CII_LEAVES = new CommonsHashSet <> ();
+  private static final ICommonsSet <String> CII_BRANCHES = new CommonsHashSet <> ();
+  private static final ICommonsSet <String> UBL_LEAVES = new CommonsHashSet <> ();
+  private static final ICommonsSet <String> UBL_BRANCHES = new CommonsHashSet <> ();
+
+  static
   {
-    final Element eContext = _child (eRoot, CII_NS_RSM, "ExchangedDocumentContext");
-    final Element eGuideline = _child (eContext, CII_NS_RAM, "GuidelineSpecifiedDocumentContextParameter");
-    final String sCustomizationID = _text (_child (eGuideline, CII_NS_RAM, "ID"));
-    final Element eProcess = _child (eContext, CII_NS_RAM, "BusinessProcessSpecifiedDocumentContextParameter");
-    final String sBusinessProcess = _text (_child (eProcess, CII_NS_RAM, "ID"));
+    CII_LEAVES.addAll (CII_GUIDELINE_ID, CII_PROCESS_ID);
+    for (final String sParty : CII_PARTIES)
+      CII_LEAVES.addAll (sParty + CII_VAT_ID, sParty + CII_POSTAL_COUNTRY);
+    for (final String sLeaf : CII_LEAVES)
+      _addBranches (sLeaf, CII_BRANCHES);
 
-    final Element eTx = _child (eRoot, CII_NS_RSM, "SupplyChainTradeTransaction");
-    final Element eAgreement = _child (eTx, CII_NS_RAM, "ApplicableHeaderTradeAgreement");
-
-    // VAT (schemeID='VA') + postal country
-    final Element eSeller = _child (eAgreement, CII_NS_RAM, "SellerTradeParty");
-    final Element eTaxRep = _child (eAgreement, CII_NS_RAM, "SellerTaxRepresentativeTradeParty");
-    final Element eBuyer = _child (eAgreement, CII_NS_RAM, "BuyerTradeParty");
-    return _build (HybridXmlContext.SYNTAX_CII,
-                   sCustomizationID,
-                   sBusinessProcess,
-                   _ciiVatID (eSeller),
-                   _ciiPostalCountry (eSeller),
-                   _ciiVatID (eTaxRep),
-                   _ciiVatID (eBuyer),
-                   _ciiPostalCountry (eBuyer));
+    UBL_LEAVES.addAll (UBL_CUSTOMIZATION_ID, UBL_PROFILE_ID);
+    for (final String sParty : UBL_PARTIES)
+      UBL_LEAVES.addAll (sParty + UBL_COMPANY_ID, sParty + UBL_TAX_SCHEME_ID, sParty + UBL_POSTAL_COUNTRY);
+    for (final String sLeaf : UBL_LEAVES)
+      _addBranches (sLeaf, UBL_BRANCHES);
   }
 
-  @Nullable
-  private static String _ciiPostalCountry (@Nullable final Element aParty)
+  private static void _addBranches (@NonNull final String sLeaf, @NonNull final ICommonsSet <String> aTarget)
   {
-    final Element eAddress = _child (aParty, CII_NS_RAM, "PostalTradeAddress");
-    return _upper (_text (_child (eAddress, CII_NS_RAM, "CountryID")));
+    int nSlash = sLeaf.indexOf ('/');
+    while (nSlash > 0)
+    {
+      aTarget.add (sLeaf.substring (0, nSlash));
+      nSlash = sLeaf.indexOf ('/', nSlash + 1);
+    }
+  }
+
+  @NonNull
+  private static String _token (@Nullable final String sNamespaceURI)
+  {
+    if (CII_NS_RAM.equals (sNamespaceURI))
+      return "ram:";
+    if (CII_NS_RSM.equals (sNamespaceURI))
+      return "rsm:";
+    if (UBL_NS_CBC.equals (sNamespaceURI))
+      return "cbc:";
+    if (UBL_NS_CAC.equals (sNamespaceURI))
+      return "cac:";
+    return "?:";
+  }
+
+  /** Skip the current element including all its descendants. */
+  private static void _skipElement (@NonNull final XMLStreamReader aReader) throws XMLStreamException
+  {
+    int nDepth = 1;
+    while (nDepth > 0)
+    {
+      final int nEvent = aReader.next ();
+      if (nEvent == XMLStreamConstants.START_ELEMENT)
+        nDepth++;
+      else
+        if (nEvent == XMLStreamConstants.END_ELEMENT)
+          nDepth--;
+    }
   }
 
   /**
-   * @return the VAT registration ID (<code>schemeID='VA'</code>) of a CII trade party, or
-   *         <code>null</code>.
+   * Read the trimmed text content of the current element (including descendants, like DOM
+   * <code>getTextContent</code>) and consume its end tag.
    */
   @Nullable
-  private static String _ciiVatID (@Nullable final Element aParty)
+  private static String _readText (@NonNull final XMLStreamReader aReader) throws XMLStreamException
   {
-    if (aParty == null)
-      return null;
-    for (final Element eReg : XMLHelper.getChildElementIteratorNS (aParty, CII_NS_RAM, "SpecifiedTaxRegistration"))
+    final StringBuilder aSB = new StringBuilder ();
+    int nDepth = 1;
+    while (nDepth > 0)
     {
-      final Element eID = _child (eReg, CII_NS_RAM, "ID");
-      if (eID != null && "VA".equals (eID.getAttribute ("schemeID")))
-        return _text (eID);
+      final int nEvent = aReader.next ();
+      switch (nEvent)
+      {
+        case XMLStreamConstants.START_ELEMENT:
+          nDepth++;
+          break;
+        case XMLStreamConstants.END_ELEMENT:
+          nDepth--;
+          break;
+        case XMLStreamConstants.CHARACTERS:
+        case XMLStreamConstants.CDATA:
+        case XMLStreamConstants.SPACE:
+          aSB.append (aReader.getText ());
+          break;
+        default:
+          break;
+      }
     }
-    return null;
+    final String sTrimmed = StringHelper.trim (aSB.toString ());
+    return StringHelper.isNotEmpty (sTrimmed) ? sTrimmed : null;
   }
 
-  @NonNull
-  private static HybridXmlContext _fromUBL (@NonNull final Element eRoot)
+  /** One open element on the path that is being followed. */
+  private static final class Frame
   {
-    final String sCustomizationID = _text (_child (eRoot, UBL_NS_CBC, "CustomizationID"));
-    final String sBusinessProcess = _text (_child (eRoot, UBL_NS_CBC, "ProfileID"));
+    private final String m_sPath;
+    private final ICommonsSet <String> m_aSeenChildren = new CommonsHashSet <> ();
 
-    final Element eSeller = _child (_child (eRoot, UBL_NS_CAC, "AccountingSupplierParty"), UBL_NS_CAC, "Party");
-    final Element eTaxRep = _child (eRoot, UBL_NS_CAC, "TaxRepresentativeParty");
-    final Element eBuyer = _child (_child (eRoot, UBL_NS_CAC, "AccountingCustomerParty"), UBL_NS_CAC, "Party");
-    return _build (HybridXmlContext.SYNTAX_UBL,
-                   sCustomizationID,
-                   sBusinessProcess,
-                   _ublVatID (eSeller),
-                   _ublPostalCountry (eSeller),
-                   _ublVatID (eTaxRep),
-                   _ublVatID (eBuyer),
-                   _ublPostalCountry (eBuyer));
-  }
-
-  @Nullable
-  private static String _ublPostalCountry (@Nullable final Element aParty)
-  {
-    final Element eAddress = _child (aParty, UBL_NS_CAC, "PostalAddress");
-    final Element eCountry = _child (eAddress, UBL_NS_CAC, "Country");
-    return _upper (_text (_child (eCountry, UBL_NS_CBC, "IdentificationCode")));
+    Frame (@NonNull final String sPath)
+    {
+      m_sPath = sPath;
+    }
   }
 
   /**
-   * @return the VAT CompanyID (<code>PartyTaxScheme</code> where <code>TaxScheme/ID='VAT'</code>)
-   *         of a UBL party, or <code>null</code>.
+   * Single-pass StAX collector. It follows only the paths that lead to a context value, mirroring
+   * the "first child element of that name" semantics, skips all other subtrees, and stops as soon
+   * as all parties have been read: after the CII <code>ApplicableHeaderTradeAgreement</code>, or at
+   * the first UBL invoice / credit note line.
    */
-  @Nullable
-  private static String _ublVatID (@Nullable final Element aParty)
+  private static final class ContextCollector
   {
-    if (aParty == null)
-      return null;
-    for (final Element ePTS : XMLHelper.getChildElementIteratorNS (aParty, UBL_NS_CAC, "PartyTaxScheme"))
+    private final boolean m_bCII;
+    private final String [] m_aParties;
+    private final ICommonsSet <String> m_aLeaves;
+    private final ICommonsSet <String> m_aBranches;
+    private final ICommonsList <Frame> m_aStack = new CommonsArrayList <> ();
+
+    private String m_sCustomizationID;
+    private String m_sBusinessProcess;
+    private final String [] m_aVatID = new String [3];
+    private final boolean [] m_aVatDone = new boolean [3];
+    private final String [] m_aPostalCountry = new String [3];
+    // UBL: values of the PartyTaxScheme currently being read
+    private String m_sCompanyID;
+    private String m_sTaxSchemeID;
+
+    ContextCollector (final boolean bCII)
     {
-      final Element eScheme = _child (ePTS, UBL_NS_CAC, "TaxScheme");
-      if ("VAT".equals (_text (_child (eScheme, UBL_NS_CBC, "ID"))))
-        return _text (_child (ePTS, UBL_NS_CBC, "CompanyID"));
+      m_bCII = bCII;
+      m_aParties = bCII ? CII_PARTIES : UBL_PARTIES;
+      m_aLeaves = bCII ? CII_LEAVES : UBL_LEAVES;
+      m_aBranches = bCII ? CII_BRANCHES : UBL_BRANCHES;
     }
-    return null;
+
+    private int _getPartyIndex (@NonNull final String sPath)
+    {
+      for (int i = 0; i < m_aParties.length; ++i)
+        if (sPath.startsWith (m_aParties[i] + "/"))
+          return i;
+      return -1;
+    }
+
+    private void _onLeaf (@NonNull final XMLStreamReader aReader, @NonNull final String sPath) throws XMLStreamException
+    {
+      if (m_bCII)
+      {
+        if (sPath.equals (CII_GUIDELINE_ID))
+          m_sCustomizationID = _readText (aReader);
+        else
+          if (sPath.equals (CII_PROCESS_ID))
+            m_sBusinessProcess = _readText (aReader);
+          else
+          {
+            final int nParty = _getPartyIndex (sPath);
+            if (sPath.endsWith (CII_POSTAL_COUNTRY))
+              m_aPostalCountry[nParty] = _upper (_readText (aReader));
+            else
+              if (!m_aVatDone[nParty] && "VA".equals (aReader.getAttributeValue (null, "schemeID")))
+              {
+                // The first registration with schemeID 'VA' wins
+                m_aVatID[nParty] = _readText (aReader);
+                m_aVatDone[nParty] = true;
+              }
+              else
+                _skipElement (aReader);
+          }
+      }
+      else
+      {
+        if (sPath.equals (UBL_CUSTOMIZATION_ID))
+          m_sCustomizationID = _readText (aReader);
+        else
+          if (sPath.equals (UBL_PROFILE_ID))
+            m_sBusinessProcess = _readText (aReader);
+          else
+          {
+            final int nParty = _getPartyIndex (sPath);
+            if (sPath.endsWith (UBL_POSTAL_COUNTRY))
+              m_aPostalCountry[nParty] = _upper (_readText (aReader));
+            else
+              if (sPath.endsWith (UBL_COMPANY_ID))
+                m_sCompanyID = _readText (aReader);
+              else
+                m_sTaxSchemeID = _readText (aReader);
+          }
+      }
+    }
+
+    private void _onBranchStart (@NonNull final String sPath)
+    {
+      if (!m_bCII && sPath.endsWith (UBL_TAX_SCHEME))
+      {
+        m_sCompanyID = null;
+        m_sTaxSchemeID = null;
+      }
+    }
+
+    private void _onBranchEnd (@NonNull final String sPath)
+    {
+      if (!m_bCII && sPath.endsWith (UBL_TAX_SCHEME))
+      {
+        // The first PartyTaxScheme with TaxScheme/ID 'VAT' wins
+        final int nParty = _getPartyIndex (sPath);
+        if (nParty >= 0 && !m_aVatDone[nParty] && "VAT".equals (m_sTaxSchemeID))
+        {
+          m_aVatID[nParty] = m_sCompanyID;
+          m_aVatDone[nParty] = true;
+        }
+      }
+    }
+
+    @NonNull
+    HybridXmlContext collect (@NonNull final XMLStreamReader aReader) throws XMLStreamException
+    {
+      // The reader is positioned on the root start element
+      final Frame aRoot = new Frame ("");
+      m_aStack.add (aRoot);
+      while (!m_aStack.isEmpty () && aReader.hasNext ())
+      {
+        final int nEvent = aReader.next ();
+        if (nEvent == XMLStreamConstants.START_ELEMENT)
+        {
+          final Frame aParent = m_aStack.getLastOrNull ();
+          final String sKey = _token (aReader.getNamespaceURI ()) + aReader.getLocalName ();
+          if (!m_bCII && aParent == aRoot && ("cac:InvoiceLine".equals (sKey) || "cac:CreditNoteLine".equals (sKey)))
+            break;
+          final boolean bFirstOfName = aParent.m_aSeenChildren.add (sKey);
+          final String sPath = aParent == aRoot ? sKey : aParent.m_sPath + "/" + sKey;
+          if (!bFirstOfName && !REPEATABLE.contains (sKey))
+            _skipElement (aReader);
+          else
+            if (m_aLeaves.contains (sPath))
+              _onLeaf (aReader, sPath);
+            else
+              if (m_aBranches.contains (sPath))
+              {
+                m_aStack.add (new Frame (sPath));
+                _onBranchStart (sPath);
+              }
+              else
+                _skipElement (aReader);
+        }
+        else
+          if (nEvent == XMLStreamConstants.END_ELEMENT)
+          {
+            final Frame aFrame = m_aStack.removeLastOrNull ();
+            _onBranchEnd (aFrame.m_sPath);
+            if (m_bCII && aFrame.m_sPath.equals (CII_AGREEMENT))
+              break;
+          }
+      }
+      return _build (m_bCII ? HybridXmlContext.SYNTAX_CII : HybridXmlContext.SYNTAX_UBL,
+                     m_sCustomizationID,
+                     m_sBusinessProcess,
+                     m_aVatID[PARTY_SELLER],
+                     m_aPostalCountry[PARTY_SELLER],
+                     m_aVatID[PARTY_TAX_REP],
+                     m_aVatID[PARTY_BUYER],
+                     m_aPostalCountry[PARTY_BUYER]);
+    }
   }
 }
