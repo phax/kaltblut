@@ -72,9 +72,9 @@ Package map under `com.helger.kaltblut.core`:
 | Package    | Role                                                                                       |
 | ---------- | ------------------------------------------------------------------------------------------ |
 | `source`   | `IHybridSource` + `HybridSource` factories. Byte-array-centric input abstraction.          |
-| `model`    | Immutable value objects: `EZugferdFlavor`, `EZugferdProfile`, `EAFRelationship`, `EZugferdCountry`, `HybridMetadata`, `HybridAttachment`. |
+| `model`    | Immutable value objects: `EZugferdFlavor`, `EZugferdProfile`, `EAFRelationship`, `EZugferdCountry`, `HybridMetadata`, `HybridAttachment`, `HybridXmlContext`. |
 | `pdfbox`   | `HybridDocument` — internal PDFBox 3 wrapper that opens the PDF once and exposes XMP + `/AF` data. The only package that touches `org.apache.pdfbox.*`. |
-| `inspect`  | Tier 1 — `HybridInspector` (flavor detection + XMP metadata).                              |
+| `inspect`  | Tier 1 — `HybridInspector` (flavor detection + XMP metadata), opt-in `HybridXmlContextReader` (the only code that parses the invoice XML; identifiers only). |
 | `extract`  | Tier 2 — `HybridExtractor` (invoice XML, named attachment, full attachment list).          |
 | `validate` | Tier 3 — `HybridValidator`, `HybridValidatorSettings`, `HybridValidationResult`, `HybridFinding`, `EHybridSeverity`, `IPdfA3ValidatorSPI`. |
 
@@ -99,6 +99,8 @@ Key design choices to preserve:
   numbered the rules. Earlier generations expressed the same requirements in prose; the
   validator applies them uniformly. Country-specific variants exist (BR-HYBRID-DE-*,
   BR-HYBRID-FR-*) driven by `EZugferdCountry`.
+- An auto-detected country (`setReadXmlContext`) triggers the BR-FX-DE-03 PDF/A-3 downgrade only
+  if the seller is in DE and the buyer is in DE or unknown.
 
 ## Telemetry (tracing)
 
@@ -116,6 +118,7 @@ Spans (nest via OTel thread-local context into a waterfall):
 | `kaltblut.inspect` | `HybridInspector.readMetadata` | INTERNAL |
 | `kaltblut.extract` | `HybridExtractor` (3 funnels; `operation` attr) | INTERNAL |
 | `kaltblut.validate` + `.brhybrid` | `HybridValidator.validate` | INTERNAL |
+| `kaltblut.xmlcontext` | `HybridXmlContextReader.readXmlContext` | INTERNAL |
 | `kaltblut.source.read` | `HybridDocument.open` → `getBytes` | CLIENT |
 | `kaltblut.pdf.open` | `HybridDocument.open` → `Loader.loadPDF` | INTERNAL |
 | `kaltblut.xmp.parse` | `HybridDocument._doReadMetadata` | INTERNAL |

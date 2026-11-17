@@ -16,6 +16,7 @@
  */
 package com.helger.kaltblut.core.model;
 
+import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 
@@ -25,6 +26,7 @@ import org.jspecify.annotations.Nullable;
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.io.nonblocking.NonBlockingByteArrayInputStream;
 import com.helger.base.tostring.ToStringGenerator;
 
 /**
@@ -101,6 +103,16 @@ public final class HybridAttachment
   public byte [] getBytes ()
   {
     return Arrays.copyOf (m_aBytes, m_aBytes.length);
+  }
+
+  /**
+   * @return a new read-only stream over the file content, without copying it. The caller is
+   *         responsible for closing it.
+   */
+  @NonNull
+  public InputStream getInputStream ()
+  {
+    return new NonBlockingByteArrayInputStream (m_aBytes);
   }
 
   public int getSize ()

@@ -238,6 +238,20 @@ PDF/A-3 validation runs via the `IPdfA3ValidatorSPI` SPI. Add `kaltblut-verapdf`
 to enable veraPDF; without it `validate()` records a single `INFORMATION` finding noting that
 PDF/A-3 conformance was not checked.
 
+#### Country auto-detection (opt-in)
+
+```java
+aValidator.getSettings ().setReadXmlContext (true);
+```
+
+While the country is `OTHER`, it is taken from the embedded XML (seller VAT prefix, then tax
+representative VAT prefix, then seller postal country) and reported as `KALTBLUT-COUNTRY-AUTO`. The
+FR rules, the DE `/AFRelationship` expectation (BR-HYBRID-11) and the BR-FX-DE-03 PDF/A-3 downgrade
+then only apply if seller and buyer are in the same country; an unknown buyer counts as being in the
+seller's country. BR-HYBRID-DE-01/02 apply accordingly. For a DE seller with a buyer outside DE, the
+non-standard warnings `KALTBLUT-DE-01` (MINIMUM) and `KALTBLUT-DE-02` (BASIC WL) are reported instead;
+they are not part of the specification.
+
 ### Command line
 
 Build the standalone fat JAR and run it:
@@ -265,6 +279,7 @@ Common options:
 | `-c`, `--country`                     | `validate` | `DE`, `FR`, or `OTHER` — drives country-specific rules                 | `OTHER`     |
 | `--no-pdfa`                           | `validate` | Skip PDF/A-3 validation via the SPI                                    | off         |
 | `--no-de-pdfa-downgrade`              | `validate` | Disable the BR-FX-DE-03 downgrade for DE↔DE invoices                   | off         |
+| `--read-xml-context`                  | `validate` | Without `-c`, take the country from the embedded XML                   | off         |
 | `-h`, `--help`                        | all        | Show help                                                              |             |
 | `-V`, `--version`                     | all        | Show version                                                           |             |
 
@@ -364,6 +379,7 @@ The public entry points emit spans that nest into a single trace (a caller-side 
 | `kaltblut.inspect`                               | `HybridInspector.readMetadata` | INTERNAL |
 | `kaltblut.extract` (`operation` attribute)       | `HybridExtractor` (all three funnels) | INTERNAL |
 | `kaltblut.validate` + `kaltblut.validate.brhybrid` | `HybridValidator.validate`   | INTERNAL |
+| `kaltblut.xmlcontext`                            | `HybridXmlContextReader.readXmlContext` | INTERNAL |
 | `kaltblut.source.read`                           | reading the raw PDF bytes      | CLIENT   |
 | `kaltblut.pdf.open`                              | PDFBox parse (`Loader.loadPDF`) | INTERNAL |
 | `kaltblut.xmp.parse`                             | XMP metadata parse             | INTERNAL |
@@ -407,6 +423,9 @@ discovered via `ServiceLoader`; only the first implementation found is used.
 Apache License, Version 2.0.
 
 ## News and Noteworthy
+
+v0.9.8 - work in progress
+* Added opt-in country auto-detection from the embedded invoice XML (`HybridValidatorSettings.setReadXmlContext`, CLI `--read-xml-context`)
 
 v0.9.7 - 2026-11-15
 * Added the new module `kaltblut-bom` - a Bill of Materials for all published Kaltblut artifacts

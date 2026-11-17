@@ -17,14 +17,17 @@
 package com.helger.kaltblut.verapdf;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.ServiceLoader;
 
+import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.jspecify.annotations.NonNull;
 import org.junit.Test;
 
 import com.helger.base.io.nonblocking.NonBlockingByteArrayOutputStream;
@@ -32,6 +35,7 @@ import com.helger.collection.commons.ICommonsList;
 import com.helger.kaltblut.core.model.EZugferdCountry;
 import com.helger.kaltblut.core.source.HybridSource;
 import com.helger.kaltblut.core.validate.EHybridSeverity;
+import com.helger.kaltblut.core.validate.EHybridValidationLayerKind;
 import com.helger.kaltblut.core.validate.HybridFinding;
 import com.helger.kaltblut.core.validate.HybridValidator;
 import com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI;
@@ -103,5 +107,58 @@ public final class VeraPdfA3ValidatorTest
     assertEquals (1, aFindings.size ());
     assertEquals ("VERAPDF-FLAVOUR", aFindings.getFirstOrNull ().getRuleID ());
     assertEquals (EHybridSeverity.ERROR, aFindings.getFirstOrNull ().getSeverity ());
+  }
+
+  /**
+   * @return a German sample with its XMP metadata removed: the invoice XML is still extractable,
+   *         but veraPDF reports a <code>VERAPDF-FLAVOUR</code> error.
+   */
+  private static byte [] _sampleWithoutXmp (@NonNull final String sPath) throws IOException
+  {
+    final byte [] aSrc = HybridSource.fromClasspath (sPath).getBytes ();
+    try (final PDDocument aDoc = Loader.loadPDF (aSrc);
+         final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
+    {
+      aDoc.getDocumentCatalog ().setMetadata (null);
+      aDoc.save (aBAOS);
+      return aBAOS.toByteArray ();
+    }
+  }
+
+  @Test
+  public void testDePdfADowngrade_ExplicitCountry () throws IOException
+  {
+    final HybridValidator v = new HybridValidator ();
+    v.getSettings ().setCountry (EZugferdCountry.DE).setCheckPdfA3 (true);
+    final HybridValidationResult aRes = v.validate (HybridSource.fromBytes (_sampleWithoutXmp (KaltblutTestFiles.ZF_2_0_1_EN16931)));
+    final ICommonsList <HybridFinding> aPdfA = aRes.getLayer (EHybridValidationLayerKind.PDF_A3).getAllFindings ();
+    assertFalse (aPdfA.isEmpty ());
+    // BR-FX-DE-03: explicit DE downgrades the PDF/A-3 errors
+    for (final HybridFinding aF : aPdfA)
+      assertTrue ("Expected downgraded finding: " + aF, aF.getSeverity () != EHybridSeverity.ERROR);
+  }
+
+  @Test
+  public void testDePdfADowngrade_AutoDetectedDomestic () throws IOException
+  {
+    // Seller and buyer are both in DE
+    final HybridValidator v = new HybridValidator ();
+    v.getSettings ().setCountry (EZugferdCountry.OTHER).setCheckPdfA3 (true).setReadXmlContext (true);
+    final HybridValidationResult aRes = v.validate (HybridSource.fromBytes (_sampleWithoutXmp (KaltblutTestFiles.ZF_2_0_1_EN16931)));
+    assertNotNull (aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO"));
+    assertFalse (aRes.hasErrorRule ("VERAPDF-FLAVOUR"));
+    assertTrue (aRes.hasRule ("VERAPDF-FLAVOUR"));
+  }
+
+  @Test
+  public void testDePdfADowngrade_AutoDetectedBuyerUnknown () throws IOException
+  {
+    // Seller is in DE and the MINIMUM sample has no buyer country, which is treated as DE
+    final HybridValidator v = new HybridValidator ();
+    v.getSettings ().setCountry (EZugferdCountry.OTHER).setCheckPdfA3 (true).setReadXmlContext (true);
+    final HybridValidationResult aRes = v.validate (HybridSource.fromBytes (_sampleWithoutXmp (KaltblutTestFiles.ZF_2_3_MINIMUM)));
+    assertTrue (aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO").getMessage ().contains ("treated as DE"));
+    assertFalse (aRes.hasErrorRule ("VERAPDF-FLAVOUR"));
+    assertTrue (aRes.hasRule ("VERAPDF-FLAVOUR"));
   }
 }
