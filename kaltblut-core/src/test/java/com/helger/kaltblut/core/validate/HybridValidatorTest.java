@@ -24,6 +24,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSName;
@@ -82,13 +83,12 @@ public final class HybridValidatorTest
 
   private static void _rewriteEmbeddedXml (@NonNull final PDDocument aDoc,
                                            @NonNull final PDNameTreeNode <PDComplexFileSpecification> aNode,
-                                           @Nullable final String sSellerVat,
-                                           @Nullable final String sBuyerCountry,
+                                           @NonNull final UnaryOperator <String> aXmlModifier,
                                            @Nullable final String sAFRelationship) throws IOException
   {
     if (aNode.getKids () != null)
       for (final PDNameTreeNode <PDComplexFileSpecification> aKid : aNode.getKids ())
-        _rewriteEmbeddedXml (aDoc, aKid, sSellerVat, sBuyerCountry, sAFRelationship);
+        _rewriteEmbeddedXml (aDoc, aKid, aXmlModifier, sAFRelationship);
     if (aNode.getNames () == null)
       return;
     for (final Map.Entry <String, PDComplexFileSpecification> aEntry : aNode.getNames ().entrySet ())
@@ -96,19 +96,8 @@ public final class HybridValidatorTest
       final PDComplexFileSpecification aSpec = aEntry.getValue ();
       final PDEmbeddedFile aOld = aSpec.getEmbeddedFileUnicode () != null ? aSpec.getEmbeddedFileUnicode ()
                                                                           : aSpec.getEmbeddedFile ();
-      String sXml = new String (StreamHelper.getAllBytes (aOld.createInputStream ()), StandardCharsets.UTF_8);
-      if (sSellerVat != null)
-        sXml = sXml.replace (">DE123456789<", ">" + sSellerVat + "<");
-      if (sBuyerCountry != null)
-      {
-        final int nBuyer = sXml.indexOf ("<ram:BuyerTradeParty>");
-        final int nCountry = sXml.indexOf ("<ram:CountryID>DE</ram:CountryID>", nBuyer);
-        sXml = sXml.substring (0, nCountry) +
-               "<ram:CountryID>" +
-               sBuyerCountry +
-               "</ram:CountryID>" +
-               sXml.substring (nCountry + "<ram:CountryID>DE</ram:CountryID>".length ());
-      }
+      final String sXml = aXmlModifier.apply (new String (StreamHelper.getAllBytes (aOld.createInputStream ()),
+                                                          StandardCharsets.UTF_8));
       final PDEmbeddedFile aNew = new PDEmbeddedFile (aDoc,
                                                       new NonBlockingByteArrayInputStream (sXml.getBytes (StandardCharsets.UTF_8)));
       aNew.setSubtype (aOld.getSubtype ());
@@ -116,6 +105,44 @@ public final class HybridValidatorTest
       aSpec.setEmbeddedFileUnicode (aNew);
       if (sAFRelationship != null)
         aSpec.getCOSObject ().setName (COSName.getPDFName ("AFRelationship"), sAFRelationship);
+    }
+  }
+
+  @NonNull
+  private static String _modifyParties (@NonNull final String sOriginalXml,
+                                        @Nullable final String sSellerVat,
+                                        @Nullable final String sBuyerCountry)
+  {
+    String sXml = sOriginalXml;
+    if (sSellerVat != null)
+      sXml = sXml.replace (">DE123456789<", ">" + sSellerVat + "<");
+    if (sBuyerCountry != null)
+    {
+      final int nBuyer = sXml.indexOf ("<ram:BuyerTradeParty>");
+      final int nCountry = sXml.indexOf ("<ram:CountryID>DE</ram:CountryID>", nBuyer);
+      sXml = sXml.substring (0, nCountry) +
+             "<ram:CountryID>" +
+             sBuyerCountry +
+             "</ram:CountryID>" +
+             sXml.substring (nCountry + "<ram:CountryID>DE</ram:CountryID>".length ());
+    }
+    return sXml;
+  }
+
+  @NonNull
+  private static byte [] _sampleWith (@NonNull final String sClasspath,
+                                      @NonNull final UnaryOperator <String> aXmlModifier,
+                                      @Nullable final String sAFRelationship) throws IOException
+  {
+    try (final PDDocument aDoc = Loader.loadPDF (HybridSource.fromClasspath (sClasspath).getBytes ());
+         final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
+    {
+      _rewriteEmbeddedXml (aDoc,
+                           aDoc.getDocumentCatalog ().getNames ().getEmbeddedFiles (),
+                           aXmlModifier,
+                           sAFRelationship);
+      aDoc.save (aBAOS);
+      return aBAOS.toByteArray ();
     }
   }
 
@@ -130,17 +157,7 @@ public final class HybridValidatorTest
                                       @Nullable final String sBuyerCountry,
                                       @Nullable final String sAFRelationship) throws IOException
   {
-    try (final PDDocument aDoc = Loader.loadPDF (HybridSource.fromClasspath (sClasspath).getBytes ());
-         final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
-    {
-      _rewriteEmbeddedXml (aDoc,
-                           aDoc.getDocumentCatalog ().getNames ().getEmbeddedFiles (),
-                           sSellerVat,
-                           sBuyerCountry,
-                           sAFRelationship);
-      aDoc.save (aBAOS);
-      return aBAOS.toByteArray ();
-    }
+    return _sampleWith (sClasspath, x -> _modifyParties (x, sSellerVat, sBuyerCountry), sAFRelationship);
   }
 
   @NonNull
@@ -320,6 +337,24 @@ public final class HybridValidatorTest
     final HybridFinding aF = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_0_1_EN16931, "ATU12345678", null, null))
                                                                                                                         .findByRuleID ("KALTBLUT-COUNTRY-AUTO");
     assertTrue (aF.getMessage ().startsWith ("No DE or FR"));
+  }
+
+  @Test
+  public void testReadXmlContext_ArbitraryXml () throws IOException
+  {
+    // The invoice XML attachment of a real sample carries something else: the country stays OTHER,
+    // the failed detection is reported and validation continues normally
+    for (final String sXml : new String [] { "<?xml version='1.0'?><catalog><book id='1'>Title</book></catalog>",
+                                             "<Invoice><ID>1</ID></Invoice>",
+                                             "this is not XML at all",
+                                             "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY e SYSTEM 'file:///etc/passwd'>]><x>&e;</x>" })
+    {
+      final HybridValidationResult aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_3_MINIMUM,
+                                                                      x -> sXml,
+                                                                      null));
+      assertFalse (sXml, aRes.hasRule ("BR-HYBRID-DE-01"));
+      assertTrue (sXml, aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO").getMessage ().contains ("could not be read"));
+    }
   }
 
   @Test

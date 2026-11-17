@@ -51,7 +51,7 @@ public final class HybridXmlContext
   private final String m_sBusinessProcessType;
   private final String m_sSellerVatCountryCode;
   private final String m_sSellerPostalCountryCode;
-  private final EZugferdCountry m_eResolvedCountry;
+  private final EZugferdCountry m_eResolvedSellerCountry;
   private final String m_sBuyerVatCountryCode;
   private final String m_sBuyerPostalCountryCode;
   private final EZugferdCountry m_eResolvedBuyerCountry;
@@ -61,19 +61,19 @@ public final class HybridXmlContext
                            @Nullable final String sBusinessProcessType,
                            @Nullable final String sSellerVatCountryCode,
                            @Nullable final String sSellerPostalCountryCode,
-                           @NonNull final EZugferdCountry eResolvedCountry,
+                           @NonNull final EZugferdCountry eResolvedSellerCountry,
                            @Nullable final String sBuyerVatCountryCode,
                            @Nullable final String sBuyerPostalCountryCode,
                            @NonNull final EZugferdCountry eResolvedBuyerCountry)
   {
-    ValueEnforcer.notNull (eResolvedCountry, "ResolvedCountry");
+    ValueEnforcer.notNull (eResolvedSellerCountry, "ResolvedSellerCountry");
     ValueEnforcer.notNull (eResolvedBuyerCountry, "ResolvedBuyerCountry");
     m_sSyntax = sSyntax;
     m_sCustomizationID = sCustomizationID;
     m_sBusinessProcessType = sBusinessProcessType;
     m_sSellerVatCountryCode = sSellerVatCountryCode;
     m_sSellerPostalCountryCode = sSellerPostalCountryCode;
-    m_eResolvedCountry = eResolvedCountry;
+    m_eResolvedSellerCountry = eResolvedSellerCountry;
     m_sBuyerVatCountryCode = sBuyerVatCountryCode;
     m_sBuyerPostalCountryCode = sBuyerPostalCountryCode;
     m_eResolvedBuyerCountry = eResolvedBuyerCountry;
@@ -132,9 +132,9 @@ public final class HybridXmlContext
    *         {@link EZugferdCountry#OTHER} when absent or unmapped.
    */
   @NonNull
-  public EZugferdCountry getResolvedCountry ()
+  public EZugferdCountry getResolvedSellerCountry ()
   {
-    return m_eResolvedCountry;
+    return m_eResolvedSellerCountry;
   }
 
   /**
@@ -186,7 +186,7 @@ public final class HybridXmlContext
                                        .append ("BusinessProcessType", m_sBusinessProcessType)
                                        .append ("SellerVatCountryCode", m_sSellerVatCountryCode)
                                        .append ("SellerPostalCountryCode", m_sSellerPostalCountryCode)
-                                       .append ("ResolvedCountry", m_eResolvedCountry)
+                                       .append ("ResolvedSellerCountry", m_eResolvedSellerCountry)
                                        .append ("BuyerVatCountryCode", m_sBuyerVatCountryCode)
                                        .append ("BuyerPostalCountryCode", m_sBuyerPostalCountryCode)
                                        .append ("ResolvedBuyerCountry", m_eResolvedBuyerCountry)
@@ -215,7 +215,7 @@ public final class HybridXmlContext
     private String m_sBusinessProcessType;
     private String m_sSellerVatCountryCode;
     private String m_sSellerPostalCountryCode;
-    private EZugferdCountry m_eResolvedCountry = EZugferdCountry.OTHER;
+    private EZugferdCountry m_eResolvedSellerCountry = EZugferdCountry.OTHER;
     private String m_sBuyerVatCountryCode;
     private String m_sBuyerPostalCountryCode;
     private EZugferdCountry m_eResolvedBuyerCountry = EZugferdCountry.OTHER;
@@ -285,15 +285,15 @@ public final class HybridXmlContext
     }
 
     /**
-     * @param eResolvedCountry
+     * @param eResolvedSellerCountry
      *        the resolved seller country. May not be <code>null</code>.
      * @return this for chaining
      */
     @NonNull
-    public Builder resolvedCountry (@NonNull final EZugferdCountry eResolvedCountry)
+    public Builder resolvedSellerCountry (@NonNull final EZugferdCountry eResolvedSellerCountry)
     {
-      ValueEnforcer.notNull (eResolvedCountry, "ResolvedCountry");
-      m_eResolvedCountry = eResolvedCountry;
+      ValueEnforcer.notNull (eResolvedSellerCountry, "ResolvedSellerCountry");
+      m_eResolvedSellerCountry = eResolvedSellerCountry;
       return this;
     }
 
@@ -342,7 +342,7 @@ public final class HybridXmlContext
                                    m_sBusinessProcessType,
                                    m_sSellerVatCountryCode,
                                    m_sSellerPostalCountryCode,
-                                   m_eResolvedCountry,
+                                   m_eResolvedSellerCountry,
                                    m_sBuyerVatCountryCode,
                                    m_sBuyerPostalCountryCode,
                                    m_eResolvedBuyerCountry);

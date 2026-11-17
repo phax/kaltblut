@@ -125,7 +125,7 @@ public final class HybridValidator
           boolean bDeCrossBorder = false;
           if (aCtx != null)
           {
-            final EZugferdCountry eSeller = aCtx.getResolvedCountry ();
+            final EZugferdCountry eSeller = aCtx.getResolvedSellerCountry ();
             final EZugferdCountry eBuyer = aCtx.getResolvedBuyerCountry ();
             // An unknown buyer counts as domestic.
             // An explicit country never knows the buyer either.

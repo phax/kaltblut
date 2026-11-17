@@ -252,7 +252,7 @@ public final class HybridXmlContextReader
     if (sCustomizationID != null)
       aSpan.setAttribute ("kaltblut.xmlcontext.customizationid",
                           StringHelper.getCutAfterLength (sCustomizationID, MAX_SPAN_ATTR_LENGTH));
-    aSpan.setAttribute ("kaltblut.xmlcontext.country", aCtx.getResolvedCountry ().getID ());
+    aSpan.setAttribute ("kaltblut.xmlcontext.country", aCtx.getResolvedSellerCountry ().getID ());
     aSpan.setStatusOk ();
   }
 
@@ -379,9 +379,9 @@ public final class HybridXmlContextReader
                            .businessProcessType (sBusinessProcess)
                            .sellerVatCountryCode (sSellerVatCountry)
                            .sellerPostalCountryCode (sSellerPostalCountry)
-                           .resolvedCountry (_resolve (sSellerVatCountry,
-                                                       _vatCountryPrefix (sTaxRepVatID),
-                                                       sSellerPostalCountry))
+                           .resolvedSellerCountry (_resolve (sSellerVatCountry,
+                                                             _vatCountryPrefix (sTaxRepVatID),
+                                                             sSellerPostalCountry))
                            .buyerVatCountryCode (sBuyerVatCountry)
                            .buyerPostalCountryCode (sBuyerPostalCountry)
                            .resolvedBuyerCountry (_resolve (sBuyerVatCountry, null, sBuyerPostalCountry))
@@ -393,7 +393,7 @@ public final class HybridXmlContextReader
   {
     final String [] ret = new String [aPaths.length];
     for (int i = 0; i < aPaths.length; ++i)
-      ret[i] = aPaths[i] + "/";
+      ret[i] = aPaths[i] + '/';
     return ret;
   }
 
@@ -516,12 +516,24 @@ public final class HybridXmlContextReader
       m_aBranches = bCII ? CII_BRANCHES : UBL_BRANCHES;
     }
 
+    /**
+     * @return the index of the party whose path prefix is the longest match for the provided path,
+     *         or -1. The longest match wins independent of the order of the prefixes.
+     */
     private int _getPartyIndex (@NonNull final String sPath)
     {
+      int ret = -1;
+      int nBestLength = 0;
       for (int i = 0; i < m_aPartyPrefixes.length; ++i)
-        if (sPath.startsWith (m_aPartyPrefixes[i]))
-          return i;
-      return -1;
+      {
+        final String sPrefix = m_aPartyPrefixes[i];
+        if (sPrefix.length () > nBestLength && sPath.startsWith (sPrefix))
+        {
+          ret = i;
+          nBestLength = sPrefix.length ();
+        }
+      }
+      return ret;
     }
 
     private void _onLeaf (@NonNull final XMLStreamReader aReader, @NonNull final String sPath) throws XMLStreamException
@@ -609,7 +621,7 @@ public final class HybridXmlContextReader
           if (!m_bCII && aParent == aRoot && ("cac:InvoiceLine".equals (sKey) || "cac:CreditNoteLine".equals (sKey)))
             break;
           final boolean bFirstOfName = aParent.m_aSeenChildren.add (sKey);
-          final String sPath = aParent == aRoot ? sKey : aParent.m_sPath + "/" + sKey;
+          final String sPath = aParent == aRoot ? sKey : aParent.m_sPath + '/' + sKey;
           if (!bFirstOfName && !REPEATABLE.contains (sKey))
             _skipElement (aReader);
           else

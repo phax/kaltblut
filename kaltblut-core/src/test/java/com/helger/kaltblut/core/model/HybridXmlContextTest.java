@@ -34,7 +34,7 @@ public final class HybridXmlContextTest
     final HybridXmlContext aCtx = HybridXmlContext.builder ().build ();
     assertNull (aCtx.getSyntax ());
     assertNull (aCtx.getBuyerCountryCode ());
-    assertEquals (EZugferdCountry.OTHER, aCtx.getResolvedCountry ());
+    assertEquals (EZugferdCountry.OTHER, aCtx.getResolvedSellerCountry ());
     assertEquals (EZugferdCountry.OTHER, aCtx.getResolvedBuyerCountry ());
   }
 
@@ -47,14 +47,14 @@ public final class HybridXmlContextTest
                                                   .businessProcessType ("A1")
                                                   .sellerVatCountryCode ("DE")
                                                   .sellerPostalCountryCode ("DE")
-                                                  .resolvedCountry (EZugferdCountry.DE)
+                                                  .resolvedSellerCountry (EZugferdCountry.DE)
                                                   .buyerPostalCountryCode ("FR")
                                                   .resolvedBuyerCountry (EZugferdCountry.FR)
                                                   .build ();
     assertEquals (HybridXmlContext.SYNTAX_CII, aCtx.getSyntax ());
     assertEquals ("urn:cen.eu:en16931:2017", aCtx.getCustomizationID ());
     assertEquals ("A1", aCtx.getBusinessProcessType ());
-    assertEquals (EZugferdCountry.DE, aCtx.getResolvedCountry ());
+    assertEquals (EZugferdCountry.DE, aCtx.getResolvedSellerCountry ());
     // No buyer VAT prefix, so the postal country is used
     assertEquals ("FR", aCtx.getBuyerCountryCode ());
     assertEquals (EZugferdCountry.FR, aCtx.getResolvedBuyerCountry ());
@@ -63,6 +63,6 @@ public final class HybridXmlContextTest
   @Test (expected = NullPointerException.class)
   public void testBuilderRejectsNullCountry ()
   {
-    HybridXmlContext.builder ().resolvedCountry (null);
+    HybridXmlContext.builder ().resolvedSellerCountry (null);
   }
 }

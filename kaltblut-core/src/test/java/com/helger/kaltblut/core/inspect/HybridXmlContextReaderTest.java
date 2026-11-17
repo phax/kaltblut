@@ -138,7 +138,7 @@ public final class HybridXmlContextReaderTest
       assertNotNull (sPath, aCtx.getCustomizationID ());
       assertEquals (sPath, "DE", aCtx.getSellerVatCountryCode ());
       assertEquals (sPath, "DE", aCtx.getSellerPostalCountryCode ());
-      assertEquals (sPath, EZugferdCountry.DE, aCtx.getResolvedCountry ());
+      assertEquals (sPath, EZugferdCountry.DE, aCtx.getResolvedSellerCountry ());
       // The MINIMUM sample has no buyer country
       assertEquals (sPath,
                     sPath.equals (KaltblutTestFiles.ZF_2_3_MINIMUM) ? EZugferdCountry.OTHER : EZugferdCountry.DE,
@@ -155,29 +155,29 @@ public final class HybridXmlContextReaderTest
     assertEquals ("A1", aCtx.getBusinessProcessType ());
     assertEquals ("FR", aCtx.getSellerVatCountryCode ());
     assertEquals ("FR", aCtx.getSellerPostalCountryCode ());
-    assertEquals (EZugferdCountry.FR, aCtx.getResolvedCountry ());
+    assertEquals (EZugferdCountry.FR, aCtx.getResolvedSellerCountry ());
   }
 
   @Test
   public void testCIICountryResolutionChain ()
   {
     // Seller VAT country wins over the postal country
-    assertEquals (EZugferdCountry.FR, _read (_cii ("FR12345678901", "DE", "DE123456789")).getResolvedCountry ());
+    assertEquals (EZugferdCountry.FR, _read (_cii ("FR12345678901", "DE", "DE123456789")).getResolvedSellerCountry ());
     // Tax representative VAT country is next
-    assertEquals (EZugferdCountry.DE, _read (_cii (null, "FR", "DE123456789")).getResolvedCountry ());
+    assertEquals (EZugferdCountry.DE, _read (_cii (null, "FR", "DE123456789")).getResolvedSellerCountry ());
     // Postal country as last resort
     final HybridXmlContext aCtx = _read (_cii (null, "DE", null));
     assertNull (aCtx.getSellerVatCountryCode ());
-    assertEquals (EZugferdCountry.DE, aCtx.getResolvedCountry ());
+    assertEquals (EZugferdCountry.DE, aCtx.getResolvedSellerCountry ());
     // Nothing at all
-    assertEquals (EZugferdCountry.OTHER, _read (_cii (null, null, null)).getResolvedCountry ());
+    assertEquals (EZugferdCountry.OTHER, _read (_cii (null, null, null)).getResolvedSellerCountry ());
     // Countries other than DE and FR
-    assertEquals (EZugferdCountry.OTHER, _read (_cii ("ATU12345678", "DE", null)).getResolvedCountry ());
+    assertEquals (EZugferdCountry.OTHER, _read (_cii ("ATU12345678", "DE", null)).getResolvedSellerCountry ());
     // A VAT number without country prefix falls through to the next source
     final HybridXmlContext aNoPrefix = _read (_cii ("123456789", "DE", null));
     assertNull (aNoPrefix.getSellerVatCountryCode ());
-    assertEquals (EZugferdCountry.DE, aNoPrefix.getResolvedCountry ());
-    assertEquals (EZugferdCountry.FR, _read (_cii ("123456789", "DE", "FR12345678901")).getResolvedCountry ());
+    assertEquals (EZugferdCountry.DE, aNoPrefix.getResolvedSellerCountry ());
+    assertEquals (EZugferdCountry.FR, _read (_cii ("123456789", "DE", "FR12345678901")).getResolvedSellerCountry ());
   }
 
   @Test
@@ -208,7 +208,7 @@ public final class HybridXmlContextReaderTest
     aCtx = _read (sUBL);
     assertEquals (EZugferdCountry.DE, aCtx.getResolvedBuyerCountry ());
     // The buyer never influences the seller country
-    assertEquals (EZugferdCountry.OTHER, aCtx.getResolvedCountry ());
+    assertEquals (EZugferdCountry.OTHER, aCtx.getResolvedSellerCountry ());
   }
 
   @Test
@@ -223,20 +223,22 @@ public final class HybridXmlContextReaderTest
       assertEquals ("urn:fdc:peppol.eu:2017:poacc:billing:01:1.0", aCtx.getBusinessProcessType ());
       assertEquals ("DE", aCtx.getSellerVatCountryCode ());
       assertEquals ("DE", aCtx.getSellerPostalCountryCode ());
-      assertEquals (EZugferdCountry.DE, aCtx.getResolvedCountry ());
+      assertEquals (EZugferdCountry.DE, aCtx.getResolvedSellerCountry ());
     }
   }
 
   @Test
   public void testUBLCountryResolutionChain ()
   {
-    assertEquals (EZugferdCountry.FR, _read (_ubl ("Invoice", "FR12345678901", "DE", null)).getResolvedCountry ());
-    assertEquals (EZugferdCountry.FR, _read (_ubl ("Invoice", null, "DE", "FR12345678901")).getResolvedCountry ());
-    assertEquals (EZugferdCountry.FR, _read (_ubl ("Invoice", null, "FR", null)).getResolvedCountry ());
-    assertEquals (EZugferdCountry.OTHER, _read (_ubl ("Invoice", null, null, null)).getResolvedCountry ());
-    assertEquals (EZugferdCountry.DE, _read (_ubl ("Invoice", "123456789", "DE", null)).getResolvedCountry ());
+    assertEquals (EZugferdCountry.FR,
+                  _read (_ubl ("Invoice", "FR12345678901", "DE", null)).getResolvedSellerCountry ());
+    assertEquals (EZugferdCountry.FR,
+                  _read (_ubl ("Invoice", null, "DE", "FR12345678901")).getResolvedSellerCountry ());
+    assertEquals (EZugferdCountry.FR, _read (_ubl ("Invoice", null, "FR", null)).getResolvedSellerCountry ());
+    assertEquals (EZugferdCountry.OTHER, _read (_ubl ("Invoice", null, null, null)).getResolvedSellerCountry ());
+    assertEquals (EZugferdCountry.DE, _read (_ubl ("Invoice", "123456789", "DE", null)).getResolvedSellerCountry ());
     // One-Stop-Shop identifiers carry no country and fall through to the next source
-    assertEquals (EZugferdCountry.DE, _read (_ubl ("Invoice", "EU372000041", "DE", null)).getResolvedCountry ());
+    assertEquals (EZugferdCountry.DE, _read (_ubl ("Invoice", "EU372000041", "DE", null)).getResolvedSellerCountry ());
     assertNull (_read (_ubl ("Invoice", "IM2760000001", "DE", null)).getSellerVatCountryCode ());
     // Raw codes are upper-cased
     final HybridXmlContext aLower = _read (_ubl ("Invoice", "de123456789", "de", null));
@@ -247,7 +249,7 @@ public final class HybridXmlContextReaderTest
     {
       final HybridXmlContext aCtx = _read (_ubl ("Invoice", sVat, "DE", null));
       assertNull (sVat, aCtx.getSellerVatCountryCode ());
-      assertEquals (sVat, EZugferdCountry.DE, aCtx.getResolvedCountry ());
+      assertEquals (sVat, EZugferdCountry.DE, aCtx.getResolvedSellerCountry ());
     }
   }
 
