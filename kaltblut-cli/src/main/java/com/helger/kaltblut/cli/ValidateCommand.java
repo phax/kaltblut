@@ -43,7 +43,7 @@ public final class ValidateCommand implements Callable <Integer>
   private static final Logger LOGGER = LoggerFactory.getLogger (ValidateCommand.class);
 
   @Option (names = { "-c", "--country" },
-           description = "Country context for country-specific rules: ${COMPLETION-CANDIDATES} (default: OTHER).")
+           description = "Country context for country-specific rules: ${COMPLETION-CANDIDATES} (default: OTHER, or auto-detected with --read-xml-context).")
   // null = not given, so that an explicit OTHER can be told apart
   private EZugferdCountry m_eCountry;
 
@@ -55,7 +55,7 @@ public final class ValidateCommand implements Callable <Integer>
   private boolean m_bNoDeDowngrade;
 
   @Option (names = { "--read-xml-context" },
-           description = "Without --country, take the country from the embedded invoice XML. Ignored if --country is set.")
+           description = "Without --country, take the country from the embedded invoice XML. Ignored if --country is set (default: false).")
   private boolean m_bReadXmlContext;
 
   @Parameters (paramLabel = "PDF", description = "One or more PDF files to validate", arity = "1..*")
@@ -76,7 +76,10 @@ public final class ValidateCommand implements Callable <Integer>
     int nInfo = 0;
     int nErrorFiles = 0;
     if (m_bReadXmlContext && m_eCountry != null)
+    {
       LOGGER.warn ("--read-xml-context is ignored because --country " + m_eCountry.getID () + " is set");
+      m_bReadXmlContext = false;
+    }
     for (final String sPath : m_aFiles)
     {
       final File aFile = new File (sPath).getAbsoluteFile ();
@@ -93,7 +96,7 @@ public final class ValidateCommand implements Callable <Integer>
         aValidator.getSettings ().setCountry (m_eCountry != null ? m_eCountry : EZugferdCountry.OTHER);
         aValidator.getSettings ().setCheckPdfA3 (!m_bNoPdfA);
         aValidator.getSettings ().setApplyDePdfADowngrade (!m_bNoDeDowngrade);
-        aValidator.getSettings ().setReadXmlContext (m_bReadXmlContext && m_eCountry == null);
+        aValidator.getSettings ().setReadXmlContext (m_bReadXmlContext);
         final HybridValidationResult aRes = aValidator.validate (aSource);
         System.out.println ("File: " + aFile.getName () + "  (" + aRes.getFindingCount () + " finding(s))");
         for (final HybridValidationLayer aLayer : aRes.getAllLayers ())

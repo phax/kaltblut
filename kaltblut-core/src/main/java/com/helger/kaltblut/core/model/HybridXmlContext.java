@@ -20,6 +20,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.concurrent.Immutable;
+import com.helger.annotation.concurrent.NotThreadSafe;
+import com.helger.base.builder.IBuilder;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.tostring.ToStringGenerator;
 
@@ -42,15 +44,7 @@ public final class HybridXmlContext
   public static final String SYNTAX_UBL = "UBL";
 
   /** The empty context: no syntax detected, all identifiers absent, country {@code OTHER}. */
-  public static final HybridXmlContext EMPTY = new HybridXmlContext (null,
-                                                                     null,
-                                                                     null,
-                                                                     null,
-                                                                     null,
-                                                                     EZugferdCountry.OTHER,
-                                                                     null,
-                                                                     null,
-                                                                     EZugferdCountry.OTHER);
+  public static final HybridXmlContext EMPTY = builder ().build ();
 
   private final String m_sSyntax;
   private final String m_sCustomizationID;
@@ -197,5 +191,161 @@ public final class HybridXmlContext
                                        .append ("BuyerPostalCountryCode", m_sBuyerPostalCountryCode)
                                        .append ("ResolvedBuyerCountry", m_eResolvedBuyerCountry)
                                        .getToString ();
+  }
+
+  /**
+   * @return a new builder. The resolved countries default to {@link EZugferdCountry#OTHER}.
+   */
+  @NonNull
+  public static Builder builder ()
+  {
+    return new Builder ();
+  }
+
+  /**
+   * Builder for {@link HybridXmlContext}.
+   *
+   * @author Alexandre Gabriel Carvalho Silva
+   */
+  @NotThreadSafe
+  public static final class Builder implements IBuilder <HybridXmlContext>
+  {
+    private String m_sSyntax;
+    private String m_sCustomizationID;
+    private String m_sBusinessProcessType;
+    private String m_sSellerVatCountryCode;
+    private String m_sSellerPostalCountryCode;
+    private EZugferdCountry m_eResolvedCountry = EZugferdCountry.OTHER;
+    private String m_sBuyerVatCountryCode;
+    private String m_sBuyerPostalCountryCode;
+    private EZugferdCountry m_eResolvedBuyerCountry = EZugferdCountry.OTHER;
+
+    Builder ()
+    {}
+
+    /**
+     * @param sSyntax
+     *        the payload syntax, {@link #SYNTAX_CII} or {@link #SYNTAX_UBL}. May be
+     *        <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder syntax (@Nullable final String sSyntax)
+    {
+      m_sSyntax = sSyntax;
+      return this;
+    }
+
+    /**
+     * @param sCustomizationID
+     *        the BT-24 Specification identifier. May be <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder customizationID (@Nullable final String sCustomizationID)
+    {
+      m_sCustomizationID = sCustomizationID;
+      return this;
+    }
+
+    /**
+     * @param sBusinessProcessType
+     *        the BT-23 Business process type. May be <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder businessProcessType (@Nullable final String sBusinessProcessType)
+    {
+      m_sBusinessProcessType = sBusinessProcessType;
+      return this;
+    }
+
+    /**
+     * @param sSellerVatCountryCode
+     *        the seller VAT identifier country prefix. May be <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder sellerVatCountryCode (@Nullable final String sSellerVatCountryCode)
+    {
+      m_sSellerVatCountryCode = sSellerVatCountryCode;
+      return this;
+    }
+
+    /**
+     * @param sSellerPostalCountryCode
+     *        the seller postal country code (BT-40). May be <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder sellerPostalCountryCode (@Nullable final String sSellerPostalCountryCode)
+    {
+      m_sSellerPostalCountryCode = sSellerPostalCountryCode;
+      return this;
+    }
+
+    /**
+     * @param eResolvedCountry
+     *        the resolved seller country. May not be <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder resolvedCountry (@NonNull final EZugferdCountry eResolvedCountry)
+    {
+      ValueEnforcer.notNull (eResolvedCountry, "ResolvedCountry");
+      m_eResolvedCountry = eResolvedCountry;
+      return this;
+    }
+
+    /**
+     * @param sBuyerVatCountryCode
+     *        the buyer VAT identifier country prefix. May be <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder buyerVatCountryCode (@Nullable final String sBuyerVatCountryCode)
+    {
+      m_sBuyerVatCountryCode = sBuyerVatCountryCode;
+      return this;
+    }
+
+    /**
+     * @param sBuyerPostalCountryCode
+     *        the buyer postal country code (BT-55). May be <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder buyerPostalCountryCode (@Nullable final String sBuyerPostalCountryCode)
+    {
+      m_sBuyerPostalCountryCode = sBuyerPostalCountryCode;
+      return this;
+    }
+
+    /**
+     * @param eResolvedBuyerCountry
+     *        the resolved buyer country. May not be <code>null</code>.
+     * @return this for chaining
+     */
+    @NonNull
+    public Builder resolvedBuyerCountry (@NonNull final EZugferdCountry eResolvedBuyerCountry)
+    {
+      ValueEnforcer.notNull (eResolvedBuyerCountry, "ResolvedBuyerCountry");
+      m_eResolvedBuyerCountry = eResolvedBuyerCountry;
+      return this;
+    }
+
+    @NonNull
+    public HybridXmlContext build ()
+    {
+      return new HybridXmlContext (m_sSyntax,
+                                   m_sCustomizationID,
+                                   m_sBusinessProcessType,
+                                   m_sSellerVatCountryCode,
+                                   m_sSellerPostalCountryCode,
+                                   m_eResolvedCountry,
+                                   m_sBuyerVatCountryCode,
+                                   m_sBuyerPostalCountryCode,
+                                   m_eResolvedBuyerCountry);
+    }
   }
 }

@@ -248,9 +248,9 @@ While the country is `OTHER`, it is taken from the embedded XML (seller VAT pref
 representative VAT prefix, then seller postal country) and reported as `KALTBLUT-COUNTRY-AUTO`. The
 FR rules, the DE `/AFRelationship` expectation (BR-HYBRID-11) and the BR-FX-DE-03 PDF/A-3 downgrade
 then only apply if seller and buyer are in the same country; an unknown buyer counts as being in the
-seller's country. BR-HYBRID-DE-01/02 apply accordingly. For a buyer in another EU, EEA, CH or UK
-country, the Kaltblut-specific warnings `KALTBLUT-DE-01` (MINIMUM) and `KALTBLUT-DE-02` (BASIC WL)
-are reported instead; they are not part of the specification.
+seller's country. BR-HYBRID-DE-01/02 apply accordingly. For a DE seller with a buyer outside DE, the
+non-standard errors `KALTBLUT-DE-01` (MINIMUM) and `KALTBLUT-DE-02` (BASIC WL) are reported instead;
+they are not part of the specification.
 
 ### Command line
 

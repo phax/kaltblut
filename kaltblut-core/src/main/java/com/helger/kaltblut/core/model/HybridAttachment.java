@@ -105,7 +105,10 @@ public final class HybridAttachment
     return Arrays.copyOf (m_aBytes, m_aBytes.length);
   }
 
-  /** @return a new read-only stream over the file content, without copying it. */
+  /**
+   * @return a new read-only stream over the file content, without copying it. The caller is
+   *         responsible for closing it.
+   */
   @NonNull
   public InputStream getInputStream ()
   {

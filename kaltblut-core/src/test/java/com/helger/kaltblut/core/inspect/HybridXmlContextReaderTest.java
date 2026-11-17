@@ -242,10 +242,13 @@ public final class HybridXmlContextReaderTest
     final HybridXmlContext aLower = _read (_ubl ("Invoice", "de123456789", "de", null));
     assertEquals ("DE", aLower.getSellerVatCountryCode ());
     assertEquals ("DE", aLower.getSellerPostalCountryCode ());
-    // VIES-only prefixes (Northern Ireland) are kept and map to OTHER
-    final HybridXmlContext aXI = _read (_ubl ("Invoice", "XI123456789", "DE", null));
-    assertEquals ("XI", aXI.getSellerVatCountryCode ());
-    assertEquals (EZugferdCountry.OTHER, aXI.getResolvedCountry ());
+    // Prefixes that are no ISO country code of the issuer fall through to the postal country
+    for (final String sVat : new String [] { "XI123456789", "EL123456789", "IN2760000001" })
+    {
+      final HybridXmlContext aCtx = _read (_ubl ("Invoice", sVat, "DE", null));
+      assertNull (sVat, aCtx.getSellerVatCountryCode ());
+      assertEquals (sVat, EZugferdCountry.DE, aCtx.getResolvedCountry ());
+    }
   }
 
   @Test

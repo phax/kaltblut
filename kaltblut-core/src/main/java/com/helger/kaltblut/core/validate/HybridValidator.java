@@ -29,9 +29,7 @@ import com.helger.annotation.concurrent.NotThreadSafe;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.timing.StopWatch;
 import com.helger.collection.commons.CommonsArrayList;
-import com.helger.collection.commons.CommonsHashSet;
 import com.helger.collection.commons.ICommonsList;
-import com.helger.collection.commons.ICommonsSet;
 import com.helger.kaltblut.core.inspect.HybridXmlContextReader;
 import com.helger.kaltblut.core.model.EAFRelationship;
 import com.helger.kaltblut.core.model.EZugferdCountry;
@@ -66,45 +64,6 @@ public final class HybridValidator
   private static final String FN_ZUGFERD_MIXED = "ZUGFeRD-invoice.xml";
 
   private static final Logger LOGGER = LoggerFactory.getLogger (HybridValidator.class);
-
-  /**
-   * Buyer countries other than DE for which an auto-detected DE seller triggers KALTBLUT-DE-01/02:
-   * the rest of the EU (incl. the VIES prefixes EL and XI), the EEA and the further EN 16931
-   * adopters CH and GB.
-   */
-  private static final ICommonsSet <String> EN16931_COUNTRIES = new CommonsHashSet <> ("AT",
-                                                                                       "BE",
-                                                                                       "BG",
-                                                                                       "CY",
-                                                                                       "CZ",
-                                                                                       "DK",
-                                                                                       "EE",
-                                                                                       "EL",
-                                                                                       "ES",
-                                                                                       "FI",
-                                                                                       "FR",
-                                                                                       "GR",
-                                                                                       "HR",
-                                                                                       "HU",
-                                                                                       "IE",
-                                                                                       "IT",
-                                                                                       "LT",
-                                                                                       "LU",
-                                                                                       "LV",
-                                                                                       "MT",
-                                                                                       "NL",
-                                                                                       "PL",
-                                                                                       "PT",
-                                                                                       "RO",
-                                                                                       "SE",
-                                                                                       "SI",
-                                                                                       "SK",
-                                                                                       "XI",
-                                                                                       "IS",
-                                                                                       "LI",
-                                                                                       "NO",
-                                                                                       "CH",
-                                                                                       "GB");
 
   private final HybridValidatorSettings m_aSettings = new HybridValidatorSettings ();
 
@@ -175,10 +134,8 @@ public final class HybridValidator
             final boolean bDomestic = eSeller != EZugferdCountry.OTHER && (bBuyerUnknown || eBuyer == eSeller);
             // The country rules only apply domestically (DE↔DE, FR↔FR)
             eCountry = bDomestic ? eSeller : EZugferdCountry.OTHER;
-            bDomesticDE = bDomestic && eSeller == EZugferdCountry.DE;
-            bDeCrossBorder = eSeller == EZugferdCountry.DE &&
-                             !bBuyerUnknown &&
-                             EN16931_COUNTRIES.contains (sBuyerCountry);
+            // DE seller with a buyer known to be outside DE
+            bDeCrossBorder = eSeller == EZugferdCountry.DE && !bDomestic;
             String sMsg;
             if (aCtx.getSyntax () == null)
               sMsg = "The embedded invoice XML could not be read for country auto-detection (missing, unparsable or unsupported syntax).";
@@ -206,9 +163,10 @@ public final class HybridValidator
                                                       sMsg,
                                                       null));
           }
+          bDomesticDE = eCountry == EZugferdCountry.DE;
           aSpanValidate.setAttribute ("kaltblut.country.effective", eCountry.getID ());
           aSpanBr.setAttribute ("kaltblut.country.effective", eCountry.getID ());
-          _applyBrHybrid (aBrHybridFindings, aMeta, eCountry, bDeCrossBorder, bDomesticDE);
+          _applyBrHybrid (aBrHybridFindings, aMeta, eCountry, bDeCrossBorder);
         }
         aSpanBr.setAttribute ("kaltblut.findings.count", aBrHybridFindings.size ());
         aSpanBr.setStatusOk ();
@@ -279,8 +237,7 @@ public final class HybridValidator
   private static void _applyBrHybrid (@NonNull final ICommonsList <HybridFinding> aOut,
                                       @NonNull final HybridMetadata aMeta,
                                       @NonNull final EZugferdCountry eCountry,
-                                      final boolean bDeCrossBorder,
-                                      final boolean bDomesticDE)
+                                      final boolean bDeCrossBorder)
   {
     final EZugferdFlavor eFlavor = aMeta.getFlavor ();
 
@@ -393,7 +350,7 @@ public final class HybridValidator
     else
       if (eProfile != null && eRel != null)
       {
-        final HybridFinding aRel = _checkAfRelationshipMatrix (eProfile, eRel, eCountry, bDomesticDE);
+        final HybridFinding aRel = _checkAfRelationshipMatrix (eProfile, eRel, eCountry);
         if (aRel != null)
           aOut.add (aRel);
       }
@@ -440,7 +397,7 @@ public final class HybridValidator
                                    "/Metadata"));
 
     // BR-HYBRID-DE-01 / DE-02 (Fatal): MINIMUM and BASIC WL must not be used DE↔DE.
-    if (bDomesticDE)
+    if (eCountry == EZugferdCountry.DE)
     {
       if (eProfile == EZugferdProfile.MINIMUM)
         aOut.add (new HybridFinding ("BR-HYBRID-DE-01",
@@ -453,19 +410,19 @@ public final class HybridValidator
                                      "BASIC WL profile is not permitted for DE↔DE invoices.",
                                      null));
     }
-    // KALTBLUT-DE-01 / DE-02 (Warning, not part of the specification): the same for an auto-
-    // detected DE seller with a buyer in another EN 16931 country.
+    // KALTBLUT-DE-01 / DE-02 (Fatal, non-standard - not part of the specification): German
+    // suppliers may not send MINIMUM or BASIC WL invoices to buyers outside DE either.
     if (bDeCrossBorder)
     {
       if (eProfile == EZugferdProfile.MINIMUM)
         aOut.add (new HybridFinding ("KALTBLUT-DE-01",
-                                     EHybridSeverity.WARNING,
-                                     "MINIMUM profile should not be used for DE to EU/EEA/CH/UK invoices.",
+                                     EHybridSeverity.ERROR,
+                                     "MINIMUM profile is not permitted for invoices from DE to other countries (non-standard Kaltblut check).",
                                      null));
       if (eProfile == EZugferdProfile.BASIC_WL)
         aOut.add (new HybridFinding ("KALTBLUT-DE-02",
-                                     EHybridSeverity.WARNING,
-                                     "BASIC WL profile should not be used for DE to EU/EEA/CH/UK invoices.",
+                                     EHybridSeverity.ERROR,
+                                     "BASIC WL profile is not permitted for invoices from DE to other countries (non-standard Kaltblut check).",
                                      null));
     }
     // BR-HYBRID-FR-01 (Fatal): XRECHNUNG must not be used FR↔FR.
@@ -487,8 +444,7 @@ public final class HybridValidator
   @Nullable
   private static HybridFinding _checkAfRelationshipMatrix (@NonNull final EZugferdProfile eProfile,
                                                            @NonNull final EAFRelationship eRel,
-                                                           @NonNull final EZugferdCountry eCountry,
-                                                           final boolean bDomesticDE)
+                                                           @NonNull final EZugferdCountry eCountry)
   {
     if (eProfile == EZugferdProfile.MINIMUM || eProfile == EZugferdProfile.BASIC_WL)
     {
@@ -505,7 +461,7 @@ public final class HybridValidator
       return null;
     }
     // For BASIC, EN 16931, EXTENDED, COMFORT, XRECHNUNG
-    if (bDomesticDE)
+    if (eCountry == EZugferdCountry.DE)
     {
       if (eRel != EAFRelationship.ALTERNATIVE)
         return new HybridFinding ("BR-HYBRID-11",

@@ -270,19 +270,13 @@ public final class HybridValidatorTest
     HybridValidationResult aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_4_BASIC_WL, null, "DE", null));
     assertTrue (aRes.hasErrorRule ("BR-HYBRID-DE-02"));
     assertFalse (aRes.hasRule ("KALTBLUT-DE-02"));
-    // DE to another EN 16931 country: only the KALTBLUT-DE-02 warning
-    for (final String sBuyer : new String [] { "FR", "AT", "NO", "CH", "GB" })
+    // DE to any other country: the non-standard KALTBLUT-DE-02 error instead
+    for (final String sBuyer : new String [] { "FR", "AT", "NO", "CH", "GB", "US" })
     {
       aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_4_BASIC_WL, null, sBuyer, null));
       assertFalse (sBuyer, aRes.hasRule ("BR-HYBRID-DE-02"));
-      final HybridFinding aF = aRes.findByRuleID ("KALTBLUT-DE-02");
-      assertNotNull (sBuyer, aF);
-      assertEquals (EHybridSeverity.WARNING, aF.getSeverity ());
+      assertTrue (sBuyer, aRes.hasErrorRule ("KALTBLUT-DE-02"));
     }
-    // DE to a non-EN 16931 country: neither
-    aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_4_BASIC_WL, null, "US", null));
-    assertFalse (aRes.hasRule ("BR-HYBRID-DE-02"));
-    assertFalse (aRes.hasRule ("KALTBLUT-DE-02"));
     assertTrue (aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO").getMessage ().contains ("buyer is not in DE"));
   }
 

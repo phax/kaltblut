@@ -51,8 +51,8 @@ import com.helger.telemetry.Telemetry;
 
 /**
  * Optional reader that peeks into the embedded invoice XML for the few routing-relevant context
- * fields (BT-24, BT-23, Seller country). This is the one place in Kaltblut that looks at the XML
- * payload; it reads identifiers only and performs no business-rule validation.
+ * fields (BT-24, BT-23, seller and buyer country). This is the one place in Kaltblut that looks at
+ * the XML payload; it reads identifiers only and performs no business-rule validation.
  * <p>
  * Targets modern CII (ZUGFeRD 2.x / Factur-X, root <code>rsm:CrossIndustryInvoice</code>) and UBL
  * (<code>Invoice</code> / <code>CreditNote</code>). ZUGFeRD 1.0's legacy
@@ -62,6 +62,10 @@ import com.helger.telemetry.Telemetry;
  * The seller and buyer countries are resolved like the Peppol <code>supplierCountry</code> /
  * <code>customerCountry</code> derivations: the VAT identifier prefix first (for the seller then
  * the tax representative VAT identifier prefix), then the postal country (BT-40 / BT-55).
+ * <p>
+ * The XML is read with StAX in a single pass that stops once all parties have been read (after the
+ * CII <code>ApplicableHeaderTradeAgreement</code>, or at the first UBL line). Content after that
+ * point is not checked for well-formedness.
  *
  * @author Alexandre Gabriel Carvalho Silva
  */
@@ -78,21 +82,75 @@ public final class HybridXmlContextReader
   private static final String UBL_NS_CREDITNOTE = "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2";
   private static final String UBL_NS_CAC = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
 
-  /** 2-letter VAT identifier prefixes that do not denote a country. */
-  private static final ICommonsSet <String> NON_COUNTRY_VAT_PREFIXES = new CommonsHashSet <> ("EU", "IM");
+  /**
+   * 2-letter VAT identifier prefixes that are no ISO 3166-1 country code of the issuing country, so
+   * that the postal country is used instead:
+   * <ul>
+   * <li>EL - Greece (ISO code GR)</li>
+   * <li>XI - Northern Ireland under the Windsor Framework (ISO user-assigned range)</li>
+   * <li>EU - non-Union OSS scheme</li>
+   * <li>IM - IOSS identification number (not the Isle of Man)</li>
+   * <li>IN - IOSS intermediary (not India)</li>
+   * </ul>
+   */
+  private static final ICommonsSet <String> NON_COUNTRY_VAT_PREFIXES = new CommonsHashSet <> ("EL",
+                                                                                              "XI",
+                                                                                              "EU",
+                                                                                              "IM",
+                                                                                              "IN");
 
   /** Upper bound for identifier values copied into span attributes. */
   private static final int MAX_SPAN_ATTR_LENGTH = 256;
 
-  // Untrusted payload: no DTDs (a DOCTYPE is rejected below) and no external entities. The JDK
-  // default implementation is used, independent of any StAX provider on the classpath.
-  private static final XMLInputFactory XML_INPUT_FACTORY = XMLInputFactory.newDefaultFactory ();
+  private static final int PARTY_SELLER = 0;
+  private static final int PARTY_TAX_REP = 1;
+  private static final int PARTY_BUYER = 2;
+
+  // Paths are relative to the root element; segments are "<ns-token>:<local name>"
+  private static final String CII_GUIDELINE_ID = "rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID";
+  private static final String CII_PROCESS_ID = "rsm:ExchangedDocumentContext/ram:BusinessProcessSpecifiedDocumentContextParameter/ram:ID";
+  private static final String CII_AGREEMENT = "rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement";
+  private static final String [] CII_PARTIES = { CII_AGREEMENT + "/ram:SellerTradeParty",
+                                                 CII_AGREEMENT + "/ram:SellerTaxRepresentativeTradeParty",
+                                                 CII_AGREEMENT + "/ram:BuyerTradeParty" };
+  private static final String [] CII_PARTY_PREFIXES = _withSlash (CII_PARTIES);
+  private static final String CII_VAT_ID = "/ram:SpecifiedTaxRegistration/ram:ID";
+  private static final String CII_POSTAL_COUNTRY = "/ram:PostalTradeAddress/ram:CountryID";
+
+  private static final String UBL_CUSTOMIZATION_ID = "cbc:CustomizationID";
+  private static final String UBL_PROFILE_ID = "cbc:ProfileID";
+  private static final String [] UBL_PARTIES = { "cac:AccountingSupplierParty/cac:Party",
+                                                 "cac:TaxRepresentativeParty",
+                                                 "cac:AccountingCustomerParty/cac:Party" };
+  private static final String [] UBL_PARTY_PREFIXES = _withSlash (UBL_PARTIES);
+  private static final String UBL_TAX_SCHEME = "/cac:PartyTaxScheme";
+  private static final String UBL_COMPANY_ID = UBL_TAX_SCHEME + "/cbc:CompanyID";
+  private static final String UBL_TAX_SCHEME_ID = UBL_TAX_SCHEME + "/cac:TaxScheme/cbc:ID";
+  private static final String UBL_POSTAL_COUNTRY = "/cac:PostalAddress/cac:Country/cbc:IdentificationCode";
+
+  /** Elements that may repeat: every occurrence is inspected, not only the first one. */
+  private static final ICommonsSet <String> REPEATABLE = new CommonsHashSet <> ("ram:SpecifiedTaxRegistration",
+                                                                                "cac:PartyTaxScheme");
+
+  // Sets, because every visited element is looked up by its path
+  private static final ICommonsSet <String> CII_LEAVES = new CommonsHashSet <> ();
+  private static final ICommonsSet <String> CII_BRANCHES = new CommonsHashSet <> ();
+  private static final ICommonsSet <String> UBL_LEAVES = new CommonsHashSet <> ();
+  private static final ICommonsSet <String> UBL_BRANCHES = new CommonsHashSet <> ();
 
   static
   {
-    XML_INPUT_FACTORY.setProperty (XMLInputFactory.IS_NAMESPACE_AWARE, Boolean.TRUE);
-    XML_INPUT_FACTORY.setProperty (XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
-    XML_INPUT_FACTORY.setProperty (XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
+    CII_LEAVES.addAll (CII_GUIDELINE_ID, CII_PROCESS_ID);
+    for (final String sParty : CII_PARTIES)
+      CII_LEAVES.addAll (sParty + CII_VAT_ID, sParty + CII_POSTAL_COUNTRY);
+    for (final String sLeaf : CII_LEAVES)
+      _addBranches (sLeaf, CII_BRANCHES);
+
+    UBL_LEAVES.addAll (UBL_CUSTOMIZATION_ID, UBL_PROFILE_ID);
+    for (final String sParty : UBL_PARTIES)
+      UBL_LEAVES.addAll (sParty + UBL_COMPANY_ID, sParty + UBL_TAX_SCHEME_ID, sParty + UBL_POSTAL_COUNTRY);
+    for (final String sLeaf : UBL_LEAVES)
+      _addBranches (sLeaf, UBL_BRANCHES);
   }
 
   private HybridXmlContextReader ()
@@ -146,8 +204,8 @@ public final class HybridXmlContextReader
 
   /**
    * Read the routing context from already-extracted invoice XML bytes. Callers that have already
-   * opened the PDF should use this overload with the bytes they already extracted, to avoid opening
-   * and parsing the PDF a second time.
+   * opened the PDF should use this overload or {@link #readXmlContext(HybridAttachment)} (which
+   * avoids a copy), to avoid opening and parsing the PDF a second time.
    *
    * @param aXml
    *        the raw invoice XML bytes, or <code>null</code> if the PDF carries no invoice XML.
@@ -198,13 +256,29 @@ public final class HybridXmlContextReader
     aSpan.setStatusOk ();
   }
 
+  /**
+   * @return a new, hardened StAX factory. Created per parse, because the StAX specification does
+   *         not guarantee that a factory is thread-safe.
+   */
+  @NonNull
+  private static XMLInputFactory _createInputFactory ()
+  {
+    // Untrusted payload: no DTDs (a DOCTYPE is rejected in _parse) and no external entities. The
+    // JDK default implementation is used, independent of any StAX provider on the classpath.
+    final XMLInputFactory aFactory = XMLInputFactory.newDefaultFactory ();
+    aFactory.setProperty (XMLInputFactory.IS_NAMESPACE_AWARE, Boolean.TRUE);
+    aFactory.setProperty (XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
+    aFactory.setProperty (XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
+    return aFactory;
+  }
+
   @NonNull
   private static HybridXmlContext _parse (@NonNull final InputStream aXmlIS)
   {
     XMLStreamReader aReader = null;
     try
     {
-      aReader = XML_INPUT_FACTORY.createXMLStreamReader (aXmlIS);
+      aReader = _createInputFactory ().createXMLStreamReader (aXmlIS);
       while (aReader.hasNext ())
       {
         final int nEvent = aReader.next ();
@@ -227,8 +301,9 @@ public final class HybridXmlContextReader
       }
       return HybridXmlContext.EMPTY;
     }
-    catch (final XMLStreamException ex)
+    catch (final XMLStreamException | RuntimeException ex)
     {
+      // RuntimeException: the DOM based predecessor treated every parser failure as unparsable
       LOGGER.warn ("Failed to parse the embedded invoice XML for context extraction");
       LOGGER.debug ("Embedded invoice XML is not parsable: " + ex.getMessage ());
       return HybridXmlContext.EMPTY;
@@ -255,20 +330,19 @@ public final class HybridXmlContextReader
   @Nullable
   private static String _vatCountryPrefix (@Nullable final String sVatID)
   {
-    // sVatID is already trimmed by _text
+    // sVatID is already trimmed by _readText
     if (sVatID == null || sVatID.length () < 2)
       return null;
     if (!RFC5234Helper.isAlpha (sVatID.charAt (0)) || !RFC5234Helper.isAlpha (sVatID.charAt (1)))
       return null;
     final String sPrefix = _upper (StringHelper.getCutAfterLength (sVatID, 2));
-    // One-Stop-Shop identifiers (non-Union scheme "EU", import scheme "IM") carry no country
     return NON_COUNTRY_VAT_PREFIXES.contains (sPrefix) ? null : sPrefix;
   }
 
   @Nullable
-  private static String _upper (@Nullable final String s)
+  private static String _upper (@Nullable final String sValue)
   {
-    return s == null ? null : s.toUpperCase (Locale.ROOT);
+    return sValue == null ? null : sValue.toUpperCase (Locale.ROOT);
   }
 
   /**
@@ -299,63 +373,28 @@ public final class HybridXmlContextReader
   {
     final String sSellerVatCountry = _vatCountryPrefix (sSellerVatID);
     final String sBuyerVatCountry = _vatCountryPrefix (sBuyerVatID);
-    return new HybridXmlContext (sSyntax,
-                                 sCustomizationID,
-                                 sBusinessProcess,
-                                 sSellerVatCountry,
-                                 sSellerPostalCountry,
-                                 _resolve (sSellerVatCountry, _vatCountryPrefix (sTaxRepVatID), sSellerPostalCountry),
-                                 sBuyerVatCountry,
-                                 sBuyerPostalCountry,
-                                 _resolve (sBuyerVatCountry, null, sBuyerPostalCountry));
+    return HybridXmlContext.builder ()
+                           .syntax (sSyntax)
+                           .customizationID (sCustomizationID)
+                           .businessProcessType (sBusinessProcess)
+                           .sellerVatCountryCode (sSellerVatCountry)
+                           .sellerPostalCountryCode (sSellerPostalCountry)
+                           .resolvedCountry (_resolve (sSellerVatCountry,
+                                                       _vatCountryPrefix (sTaxRepVatID),
+                                                       sSellerPostalCountry))
+                           .buyerVatCountryCode (sBuyerVatCountry)
+                           .buyerPostalCountryCode (sBuyerPostalCountry)
+                           .resolvedBuyerCountry (_resolve (sBuyerVatCountry, null, sBuyerPostalCountry))
+                           .build ();
   }
 
-  private static final int PARTY_SELLER = 0;
-  private static final int PARTY_TAX_REP = 1;
-  private static final int PARTY_BUYER = 2;
-
-  // Paths are relative to the root element; segments are "<ns-token>:<local name>"
-  private static final String CII_GUIDELINE_ID = "rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID";
-  private static final String CII_PROCESS_ID = "rsm:ExchangedDocumentContext/ram:BusinessProcessSpecifiedDocumentContextParameter/ram:ID";
-  private static final String CII_AGREEMENT = "rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement";
-  private static final String [] CII_PARTIES = { CII_AGREEMENT + "/ram:SellerTradeParty",
-                                                 CII_AGREEMENT + "/ram:SellerTaxRepresentativeTradeParty",
-                                                 CII_AGREEMENT + "/ram:BuyerTradeParty" };
-  private static final String CII_VAT_ID = "/ram:SpecifiedTaxRegistration/ram:ID";
-  private static final String CII_POSTAL_COUNTRY = "/ram:PostalTradeAddress/ram:CountryID";
-
-  private static final String UBL_CUSTOMIZATION_ID = "cbc:CustomizationID";
-  private static final String UBL_PROFILE_ID = "cbc:ProfileID";
-  private static final String [] UBL_PARTIES = { "cac:AccountingSupplierParty/cac:Party",
-                                                 "cac:TaxRepresentativeParty",
-                                                 "cac:AccountingCustomerParty/cac:Party" };
-  private static final String UBL_TAX_SCHEME = "/cac:PartyTaxScheme";
-  private static final String UBL_COMPANY_ID = UBL_TAX_SCHEME + "/cbc:CompanyID";
-  private static final String UBL_TAX_SCHEME_ID = UBL_TAX_SCHEME + "/cac:TaxScheme/cbc:ID";
-  private static final String UBL_POSTAL_COUNTRY = "/cac:PostalAddress/cac:Country/cbc:IdentificationCode";
-
-  /** Elements that may repeat: every occurrence is inspected, not only the first one. */
-  private static final ICommonsSet <String> REPEATABLE = new CommonsHashSet <> ("ram:SpecifiedTaxRegistration",
-                                                                                "cac:PartyTaxScheme");
-
-  private static final ICommonsSet <String> CII_LEAVES = new CommonsHashSet <> ();
-  private static final ICommonsSet <String> CII_BRANCHES = new CommonsHashSet <> ();
-  private static final ICommonsSet <String> UBL_LEAVES = new CommonsHashSet <> ();
-  private static final ICommonsSet <String> UBL_BRANCHES = new CommonsHashSet <> ();
-
-  static
+  @NonNull
+  private static String [] _withSlash (@NonNull final String [] aPaths)
   {
-    CII_LEAVES.addAll (CII_GUIDELINE_ID, CII_PROCESS_ID);
-    for (final String sParty : CII_PARTIES)
-      CII_LEAVES.addAll (sParty + CII_VAT_ID, sParty + CII_POSTAL_COUNTRY);
-    for (final String sLeaf : CII_LEAVES)
-      _addBranches (sLeaf, CII_BRANCHES);
-
-    UBL_LEAVES.addAll (UBL_CUSTOMIZATION_ID, UBL_PROFILE_ID);
-    for (final String sParty : UBL_PARTIES)
-      UBL_LEAVES.addAll (sParty + UBL_COMPANY_ID, sParty + UBL_TAX_SCHEME_ID, sParty + UBL_POSTAL_COUNTRY);
-    for (final String sLeaf : UBL_LEAVES)
-      _addBranches (sLeaf, UBL_BRANCHES);
+    final String [] ret = new String [aPaths.length];
+    for (int i = 0; i < aPaths.length; ++i)
+      ret[i] = aPaths[i] + "/";
+    return ret;
   }
 
   private static void _addBranches (@NonNull final String sLeaf, @NonNull final ICommonsSet <String> aTarget)
@@ -389,6 +428,8 @@ public final class HybridXmlContextReader
     while (nDepth > 0)
     {
       final int nEvent = aReader.next ();
+      if (nEvent == XMLStreamConstants.END_DOCUMENT)
+        throw new XMLStreamException ("Unexpected end of document");
       if (nEvent == XMLStreamConstants.START_ELEMENT)
         nDepth++;
       else
@@ -411,6 +452,8 @@ public final class HybridXmlContextReader
       final int nEvent = aReader.next ();
       switch (nEvent)
       {
+        case XMLStreamConstants.END_DOCUMENT:
+          throw new XMLStreamException ("Unexpected end of document");
         case XMLStreamConstants.START_ELEMENT:
           nDepth++;
           break;
@@ -451,7 +494,7 @@ public final class HybridXmlContextReader
   private static final class ContextCollector
   {
     private final boolean m_bCII;
-    private final String [] m_aParties;
+    private final String [] m_aPartyPrefixes;
     private final ICommonsSet <String> m_aLeaves;
     private final ICommonsSet <String> m_aBranches;
     private final ICommonsList <Frame> m_aStack = new CommonsArrayList <> ();
@@ -468,15 +511,15 @@ public final class HybridXmlContextReader
     ContextCollector (final boolean bCII)
     {
       m_bCII = bCII;
-      m_aParties = bCII ? CII_PARTIES : UBL_PARTIES;
+      m_aPartyPrefixes = bCII ? CII_PARTY_PREFIXES : UBL_PARTY_PREFIXES;
       m_aLeaves = bCII ? CII_LEAVES : UBL_LEAVES;
       m_aBranches = bCII ? CII_BRANCHES : UBL_BRANCHES;
     }
 
     private int _getPartyIndex (@NonNull final String sPath)
     {
-      for (int i = 0; i < m_aParties.length; ++i)
-        if (sPath.startsWith (m_aParties[i] + "/"))
+      for (int i = 0; i < m_aPartyPrefixes.length; ++i)
+        if (sPath.startsWith (m_aPartyPrefixes[i]))
           return i;
       return -1;
     }
