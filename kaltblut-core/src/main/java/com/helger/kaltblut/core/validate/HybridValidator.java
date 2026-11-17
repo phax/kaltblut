@@ -410,19 +410,20 @@ public final class HybridValidator
                                      "BASIC WL profile is not permitted for DE↔DE invoices.",
                                      null));
     }
-    // KALTBLUT-DE-01 / DE-02 (Fatal, non-standard - not part of the specification): German
-    // suppliers may not send MINIMUM or BASIC WL invoices to buyers outside DE either.
+    // KALTBLUT-DE-01 / DE-02 (Warning, non-standard - not part of the specification): the same for
+    // a DE seller with a buyer outside DE. Only a warning, because a receiver (C3) cannot enforce
+    // it.
     if (bDeCrossBorder)
     {
       if (eProfile == EZugferdProfile.MINIMUM)
         aOut.add (new HybridFinding ("KALTBLUT-DE-01",
-                                     EHybridSeverity.ERROR,
-                                     "MINIMUM profile is not permitted for invoices from DE to other countries (non-standard Kaltblut check).",
+                                     EHybridSeverity.WARNING,
+                                     "MINIMUM profile should not be used for invoices from DE to other countries (non-standard Kaltblut check).",
                                      null));
       if (eProfile == EZugferdProfile.BASIC_WL)
         aOut.add (new HybridFinding ("KALTBLUT-DE-02",
-                                     EHybridSeverity.ERROR,
-                                     "BASIC WL profile is not permitted for invoices from DE to other countries (non-standard Kaltblut check).",
+                                     EHybridSeverity.WARNING,
+                                     "BASIC WL profile should not be used for invoices from DE to other countries (non-standard Kaltblut check).",
                                      null));
     }
     // BR-HYBRID-FR-01 (Fatal): XRECHNUNG must not be used FR↔FR.

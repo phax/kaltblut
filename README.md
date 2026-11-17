@@ -249,7 +249,7 @@ representative VAT prefix, then seller postal country) and reported as `KALTBLUT
 FR rules, the DE `/AFRelationship` expectation (BR-HYBRID-11) and the BR-FX-DE-03 PDF/A-3 downgrade
 then only apply if seller and buyer are in the same country; an unknown buyer counts as being in the
 seller's country. BR-HYBRID-DE-01/02 apply accordingly. For a DE seller with a buyer outside DE, the
-non-standard errors `KALTBLUT-DE-01` (MINIMUM) and `KALTBLUT-DE-02` (BASIC WL) are reported instead;
+non-standard warnings `KALTBLUT-DE-01` (MINIMUM) and `KALTBLUT-DE-02` (BASIC WL) are reported instead;
 they are not part of the specification.
 
 ### Command line

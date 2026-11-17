@@ -270,12 +270,14 @@ public final class HybridValidatorTest
     HybridValidationResult aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_4_BASIC_WL, null, "DE", null));
     assertTrue (aRes.hasErrorRule ("BR-HYBRID-DE-02"));
     assertFalse (aRes.hasRule ("KALTBLUT-DE-02"));
-    // DE to any other country: the non-standard KALTBLUT-DE-02 error instead
+    // DE to any other country: the non-standard KALTBLUT-DE-02 warning instead
     for (final String sBuyer : new String [] { "FR", "AT", "NO", "CH", "GB", "US" })
     {
       aRes = _validateAuto (_sampleWith (KaltblutTestFiles.ZF_2_4_BASIC_WL, null, sBuyer, null));
       assertFalse (sBuyer, aRes.hasRule ("BR-HYBRID-DE-02"));
-      assertTrue (sBuyer, aRes.hasErrorRule ("KALTBLUT-DE-02"));
+      final HybridFinding aF = aRes.findByRuleID ("KALTBLUT-DE-02");
+      assertNotNull (sBuyer, aF);
+      assertEquals (sBuyer, EHybridSeverity.WARNING, aF.getSeverity ());
     }
     assertTrue (aRes.findByRuleID ("KALTBLUT-COUNTRY-AUTO").getMessage ().contains ("buyer is not in DE"));
   }
