@@ -424,7 +424,7 @@ Apache License, Version 2.0.
 
 ## News and Noteworthy
 
-v0.9.8 - work in progress
+v1.0.0 - 2026-11-18
 * Added opt-in country auto-detection from the embedded invoice XML (`HybridValidatorSettings.setReadXmlContext`, CLI `--read-xml-context`).
   The country rules only apply if seller and buyer are in the same country.
   See [#2](https://github.com/phax/kaltblut/pull/2) - thx @KbraBass
