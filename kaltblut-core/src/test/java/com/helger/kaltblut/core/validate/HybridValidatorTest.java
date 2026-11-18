@@ -210,6 +210,8 @@ public final class HybridValidatorTest
   {
     final HybridValidationResult aRes = _newValidator (EZugferdCountry.FR).validate (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_2_XRECHNUNG));
     assertTrue ("BR-HYBRID-FR-01 must fire for XRECHNUNG in FR", aRes.hasErrorRule ("BR-HYBRID-FR-01"));
+    // n/a in the AFRelationship matrix - only reported by BR-HYBRID-FR-01
+    assertFalse (aRes.hasRule ("BR-HYBRID-11"));
   }
 
   @Test

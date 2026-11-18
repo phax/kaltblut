@@ -154,11 +154,9 @@ public final class HybridValidator
     }
     if (eCountry == EZugferdCountry.FR)
     {
+      // XRECHNUNG is n/a in FR - that is reported by BR-HYBRID-FR-01, not by the matrix
       if (eProfile == EZugferdProfile.XRECHNUNG)
-        return new HybridFinding ("BR-HYBRID-11",
-                                  EHybridSeverity.WARNING,
-                                  "XRECHNUNG profile is not used in France.",
-                                  "/Catalog/AF");
+        return null;
 
       if (eRel != EAFRelationship.ALTERNATIVE && eRel != EAFRelationship.SOURCE && eRel != EAFRelationship.DATA)
         return new HybridFinding ("BR-HYBRID-11",
@@ -326,10 +324,16 @@ public final class HybridValidator
     // BR-HYBRID-11 (Warning): /AFRelationship SHOULD follow the profile × country matrix.
     final EAFRelationship eRel = aMeta.getAFRelationship ();
     if (eRel == null && aMeta.getEmbeddedFileName () != null)
+    {
+      final String sRawRel = aMeta.getRawAFRelationship ();
       aOut.add (new HybridFinding ("BR-HYBRID-11",
                                    EHybridSeverity.WARNING,
-                                   "/AFRelationship is missing on the embedded invoice file specification.",
+                                   sRawRel == null ? "/AFRelationship is missing on the embedded invoice file specification."
+                                                   : "/AFRelationship '" +
+                                                     sRawRel +
+                                                     "' on the embedded invoice file specification is not a known value.",
                                    "/Catalog/AF"));
+    }
     else
       if (eProfile != null && eRel != null)
       {
@@ -550,7 +554,8 @@ public final class HybridValidator
       {
         final StopWatch aSwPdfA = StopWatch.createdStarted ();
         ICommonsList <HybridFinding> aPdfAFindings = _runPdfA3 (aSource);
-        // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
+        // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is extractable. Whether the
+        // XML is valid is out of scope (see phive-rules-zugferd).
         // An auto-detected DE requires both seller and buyer to be in DE.
         if (m_aSettings.isApplyDePdfADowngrade () &&
             bDomesticDE &&

@@ -21,7 +21,10 @@ import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSArray;
@@ -52,7 +55,6 @@ import com.helger.annotation.WillClose;
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.io.nonblocking.NonBlockingByteArrayOutputStream;
-import com.helger.base.io.stream.StreamHelper;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.CommonsHashMap;
 import com.helger.collection.commons.ICommonsList;
@@ -92,8 +94,9 @@ public final class HybridDocument implements AutoCloseable
 
   /**
    * Maximum recursion depth for the embedded-files name tree. A malicious PDF whose name-tree nodes
-   * reference each other cyclically (or nest absurdly deeply) would otherwise cause a
-   * {@link StackOverflowError}; this bound converts that into a clean {@link IOException}.
+   * nest absurdly deeply would otherwise cause a {@link StackOverflowError}; this bound converts
+   * that into a clean {@link IOException}. Nodes that are referenced more than once (including
+   * cycles) are walked only once.
    */
   private static final int MAX_NAME_TREE_DEPTH = 100;
 
@@ -391,10 +394,16 @@ public final class HybridDocument implements AutoCloseable
 
   private static void _recursiveCollectAllEmbeddedFilesRecursive (@NonNull final PDNameTreeNode <PDComplexFileSpecification> aNode,
                                                                   @NonNull final ICommonsMap <String, PDComplexFileSpecification> aOut,
+                                                                  @NonNull final Set <COSDictionary> aVisited,
                                                                   final int nDepth) throws IOException
   {
     if (nDepth > MAX_NAME_TREE_DEPTH)
       throw new IOException ("Embedded-files name tree exceeds the maximum depth of " + MAX_NAME_TREE_DEPTH);
+
+    // A node referenced more than once would otherwise be walked once per path to it, which grows
+    // exponentially with the depth
+    if (!aVisited.add (aNode.getCOSObject ()))
+      return;
 
     final var aDirect = aNode.getNames ();
     if (aDirect != null)
@@ -403,14 +412,16 @@ public final class HybridDocument implements AutoCloseable
     final var aKids = aNode.getKids ();
     if (aKids != null)
       for (final var aKid : aKids)
-        _recursiveCollectAllEmbeddedFilesRecursive (aKid, aOut, nDepth + 1);
+        _recursiveCollectAllEmbeddedFilesRecursive (aKid, aOut, aVisited, nDepth + 1);
   }
 
   @NonNull
   private static ICommonsMap <String, PDComplexFileSpecification> _collectAllEmbeddedFiles (@NonNull final PDEmbeddedFilesNameTreeNode aNode) throws IOException
   {
     final ICommonsMap <String, PDComplexFileSpecification> aResult = new CommonsHashMap <> ();
-    _recursiveCollectAllEmbeddedFilesRecursive (aNode, aResult, 0);
+    // Identity, because each indirect object is resolved to a single COSDictionary instance
+    final Set <COSDictionary> aVisited = Collections.newSetFromMap (new IdentityHashMap <> ());
+    _recursiveCollectAllEmbeddedFilesRecursive (aNode, aResult, aVisited, 0);
     return aResult;
   }
 
@@ -431,20 +442,14 @@ public final class HybridDocument implements AutoCloseable
 
   /**
    * Read at most <code>nMaxBytes</code> bytes from the given input stream into a byte array. A
-   * value of {@code -1} for <code>nMaxBytes</code> disables the limit (equivalent to
-   * {@link StreamHelper#getAllBytes(InputStream)}). The stream is consumed but not closed.
+   * value of {@code -1} for <code>nMaxBytes</code> disables the limit. Read errors are propagated
+   * as {@link IOException}. The stream is consumed but not closed.
    */
   @NonNull
   private static byte [] _readBounded (@NonNull final InputStream aIS,
                                        @CheckForSigned final long nMaxBytes,
                                        @NonNull final String sWhat) throws IOException
   {
-    if (nMaxBytes < 0)
-    {
-      final byte [] aAll = StreamHelper.getAllBytes (aIS);
-      return aAll != null ? aAll : new byte [0];
-    }
-
     try (final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
     {
       final byte [] aBuf = new byte [8192];
@@ -453,7 +458,7 @@ public final class HybridDocument implements AutoCloseable
       while ((nRead = aIS.read (aBuf)) > 0)
       {
         nTotal += nRead;
-        if (nTotal > nMaxBytes)
+        if (nMaxBytes >= 0 && nTotal > nMaxBytes)
           throw new IOException (sWhat + " exceeded limit of " + nMaxBytes + " bytes");
         aBAOS.write (aBuf, 0, nRead);
       }

@@ -49,7 +49,7 @@ import com.helger.telemetry.Telemetry;
  * <code>META-INF/services/com.helger.kaltblut.core.validate.IPdfA3ValidatorSPI</code>.
  * <p>
  * The validator auto-detects the PDF/A flavor from the document itself and only proceeds if it is
- * PDF/A-3 (3a / 3b / 3u) or PDF/A-4f. Other flavors produce a single {@code FATAL} finding.
+ * PDF/A-3 (3a / 3b / 3u) or PDF/A-4f. Other flavors produce a single {@code ERROR} finding.
  *
  * @author Philip Helger
  */
@@ -184,8 +184,6 @@ public final class VeraPdfA3ValidatorSPI implements IPdfA3ValidatorSPI
                                      EHybridSeverity.ERROR,
                                      "veraPDF validation could not be completed (" +
                                                             ex.getClass ().getName () +
-                                                            ": " +
-                                                            ex.getMessage () +
                                                             "); PDF/A-3 conformance was not confirmed.",
                                      null));
       }

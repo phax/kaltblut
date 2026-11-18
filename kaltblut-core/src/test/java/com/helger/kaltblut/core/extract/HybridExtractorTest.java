@@ -23,9 +23,19 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDDocumentNameDictionary;
+import org.apache.pdfbox.pdmodel.PDEmbeddedFilesNameTreeNode;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDComplexFileSpecification;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDEmbeddedFile;
 import org.junit.Test;
 
+import com.helger.base.io.nonblocking.NonBlockingByteArrayInputStream;
+import com.helger.base.io.nonblocking.NonBlockingByteArrayOutputStream;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.kaltblut.core.model.HybridAttachment;
 import com.helger.kaltblut.core.source.HybridSource;
@@ -38,6 +48,38 @@ import com.helger.kaltblut.testfiles.KaltblutTestFiles;
  */
 public final class HybridExtractorTest
 {
+  /**
+   * @return a PDF whose embedded-files name tree has <code>nDepth</code> levels above a single leaf,
+   *         where every node references the same child twice.
+   */
+  private static byte [] _pdfWithSharedNameTreeNodes (final int nDepth) throws IOException
+  {
+    try (final PDDocument aDoc = new PDDocument ();
+         final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
+    {
+      aDoc.addPage (new PDPage ());
+
+      final PDComplexFileSpecification aSpec = new PDComplexFileSpecification ();
+      aSpec.setFile ("a.txt");
+      aSpec.setEmbeddedFile (new PDEmbeddedFile (aDoc,
+                                                 new NonBlockingByteArrayInputStream ("abc".getBytes (StandardCharsets.UTF_8))));
+      PDEmbeddedFilesNameTreeNode aNode = new PDEmbeddedFilesNameTreeNode ();
+      aNode.setNames (Map.of ("a.txt", aSpec));
+      for (int i = 0; i < nDepth; ++i)
+      {
+        final PDEmbeddedFilesNameTreeNode aParent = new PDEmbeddedFilesNameTreeNode ();
+        aParent.setKids (List.of (aNode, aNode));
+        aNode = aParent;
+      }
+
+      final PDDocumentNameDictionary aNames = new PDDocumentNameDictionary (aDoc.getDocumentCatalog ());
+      aNames.setEmbeddedFiles (aNode);
+      aDoc.getDocumentCatalog ().setNames (aNames);
+      aDoc.save (aBAOS);
+      return aBAOS.toByteArray ();
+    }
+  }
+
   @Test
   public void testExtractInvoiceXml_LegacyFileName () throws IOException
   {
@@ -93,5 +135,14 @@ public final class HybridExtractorTest
     final byte [] aBytes = HybridExtractor.extractAttachment (HybridSource.fromClasspath (KaltblutTestFiles.ZF_2_0_1_EN16931),
                                                               "does-not-exist.xml");
     assertNull (aBytes);
+  }
+
+  @Test (timeout = 30_000)
+  public void testListAttachments_SharedNameTreeNodes () throws IOException
+  {
+    // Without tracking visited nodes, this walks 2^60 paths
+    final ICommonsList <HybridAttachment> aAtts = HybridExtractor.listAttachments (HybridSource.fromBytes (_pdfWithSharedNameTreeNodes (60)));
+    assertEquals (1, aAtts.size ());
+    assertEquals ("a.txt", aAtts.get (0).getName ());
   }
 }

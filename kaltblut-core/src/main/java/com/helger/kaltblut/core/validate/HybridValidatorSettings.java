@@ -93,8 +93,8 @@ public final class HybridValidatorSettings
 
   /**
    * @return whether to apply the <code>BR-FX-DE-03</code> downgrade (PDF/A-3 fatal errors become
-   *         warnings when {@link #getCountry()} is {@link EZugferdCountry#DE} and the XML is valid
-   *         / extractable). Default <code>true</code>. For an auto-detected country, the seller
+   *         warnings when {@link #getCountry()} is {@link EZugferdCountry#DE} and the invoice XML
+   *         is extractable). The XML itself is not validated. Default <code>true</code>. For an auto-detected country, the seller
    *         must be in DE and the buyer in DE or unknown.
    */
   public boolean isApplyDePdfADowngrade ()

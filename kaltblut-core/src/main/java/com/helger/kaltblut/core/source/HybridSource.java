@@ -74,8 +74,9 @@ public final class HybridSource
   }
 
   /**
-   * Create a source backed by a slice of a byte array. The slice is copied into a fresh array so
-   * that subsequent mutation of the source array is not observed by this source.
+   * Create a source backed by a slice of a byte array. A partial slice is copied into a fresh array
+   * so that subsequent mutation of the source array is not observed by this source. A slice that
+   * spans the whole array is used without copying, so the caller must not modify it afterwards.
    *
    * @param aBytes
    *        the bytes of the PDF. May not be <code>null</code>.
@@ -246,13 +247,14 @@ public final class HybridSource
   }
 
   /**
-   * Create a source from a classpath resource resolved via the given class's classloader. Bytes are
-   * read eagerly.
+   * Create a source from a classpath resource resolved via the given classloader. Bytes are read
+   * eagerly.
    *
    * @param sResourcePath
-   *        the resource path. Absolute (starting with {@code /}) or relative to the loader class.
+   *        the resource path, relative to the classpath root and without a leading {@code /} (as
+   *        required by {@link ClassLoader#getResourceAsStream(String)}).
    * @param aLoader
-   *        the class whose classloader is used. May not be <code>null</code>.
+   *        the classloader to use. May not be <code>null</code>.
    * @return a hybrid source.
    * @throws IOException
    *         if the resource is not found or cannot be read.
@@ -463,6 +465,10 @@ public final class HybridSource
       final URLConnection aConn = _openConnection ();
       final long nAdvertised = aConn.getContentLengthLong ();
       if (nAdvertised >= 0 && nAdvertised > nMaxBytes)
+      {
+        // Release the already established connection, as its body is never read
+        if (aConn instanceof final HttpURLConnection aHttpConn)
+          aHttpConn.disconnect ();
         throw new IOException ("URL " +
                                m_aUrl +
                                " advertised Content-Length " +
@@ -470,6 +476,7 @@ public final class HybridSource
                                " exceeds limit of " +
                                nMaxBytes +
                                " bytes");
+      }
       try (final InputStream aIS = aConn.getInputStream ();
            final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
       {

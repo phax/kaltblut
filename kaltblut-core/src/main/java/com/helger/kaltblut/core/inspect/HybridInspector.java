@@ -49,10 +49,9 @@ public final class HybridInspector
    *
    * @param aSource
    *        the source. May not be <code>null</code>.
-   * @return <code>true</code> if recognised, <code>false</code> otherwise (including when the input
-   *         is not a valid PDF).
+   * @return <code>true</code> if recognised, <code>false</code> otherwise.
    * @throws IOException
-   *         on I/O failure reading the source.
+   *         on I/O failure reading the source, or if the input is not a valid PDF.
    */
   public static boolean isHybridInvoice (@NonNull final IHybridSource aSource) throws IOException
   {

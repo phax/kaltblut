@@ -430,6 +430,14 @@ v0.9.8 - work in progress
   See [#2](https://github.com/phax/kaltblut/pull/2) - thx @KbraBass
 * Added the new classes `HybridXmlContext` (with builder) and `HybridXmlContextReader` to read BT-23, BT-24 and the seller and buyer countries from CII and UBL payloads.
 * Added `EZugferdCountry.getFromCountryCode` and `HybridAttachment.getInputStream`.
+* Each embedded-files name tree node is now walked only once, so that a crafted PDF with shared nodes can no longer cause exponential processing time
+* A read error of an embedded file or the XMP metadata with an unlimited size limit now throws an `IOException` instead of yielding empty bytes
+* BR-HYBRID-11 is no longer reported for the XRECHNUNG profile in FR, as that is covered by BR-HYBRID-FR-01
+* BR-HYBRID-11 now reports an unknown `/AFRelationship` value as such instead of as missing
+* The `VERAPDF-ERROR` finding no longer contains the raw exception message
+* An HTTP connection is now released if the advertised `Content-Length` exceeds the limit
+* The CLI now shows the version with `-V` and supports `-h` / `-V` on all subcommands
+* The CLI fat JAR now also excludes `.RSA`, `.DSA` and `.EC` signature files
 * Added the non-standard warnings `KALTBLUT-DE-01` and `KALTBLUT-DE-02` for a DE seller using MINIMUM or BASIC WL with a buyer outside DE.
 
 v0.9.7 - 2026-11-15
