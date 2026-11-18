@@ -67,111 +67,6 @@ public final class HybridValidator
 
   private final HybridValidatorSettings m_aSettings = new HybridValidatorSettings ();
 
-  /** @return the mutable settings object backing this validator. */
-  @NonNull
-  public HybridValidatorSettings getSettings ()
-  {
-    return m_aSettings;
-  }
-
-  /**
-   * Validate the given source.
-   *
-   * @param aSource
-   *        the source.
-   * @return the aggregated result.
-   * @throws IOException
-   *         on I/O failure.
-   */
-  @NonNull
-  public HybridValidationResult validate (@NonNull final IHybridSource aSource) throws IOException
-  {
-    ValueEnforcer.notNull (aSource, "Source");
-
-    return Telemetry.withSpanThrowing ("kaltblut.validate", ETelemetrySpanKind.INTERNAL, aSpanValidate -> {
-      if (aSource.getName () != null)
-        aSpanValidate.setAttribute ("kaltblut.source.name", aSource.getName ());
-      aSpanValidate.setAttribute ("kaltblut.country", m_aSettings.getCountry ().getID ());
-      aSpanValidate.setAttribute ("kaltblut.check.pdfa3", m_aSettings.isCheckPdfA3 ());
-
-      final ICommonsList <HybridValidationLayer> aLayers = new CommonsArrayList <> ();
-
-      // Layer 1: BR-HYBRID business rules
-      final ICommonsList <HybridFinding> aBrHybridFindings = new CommonsArrayList <> ();
-      boolean bXmlExtractable = false;
-      boolean bDomesticDE = m_aSettings.getCountry () == EZugferdCountry.DE;
-      final StopWatch aSwBrHybrid = StopWatch.createdStarted ();
-      // Manual span (not withSpan) so that bXmlExtractable and bDomesticDE can escape to the PDF/A
-      // downgrade logic.
-      // The nested source.read / pdf.open / xmp.parse / attachments spans attach under this one.
-      try (final ITelemetrySpan aSpanBr = Telemetry.startSpan ("kaltblut.validate.brhybrid",
-                                                               ETelemetrySpanKind.INTERNAL))
-      {
-        try (final HybridDocument aDoc = HybridDocument.open (aSource, m_aSettings.getLimits ()))
-        {
-          final HybridMetadata aMeta = aDoc.readMetadata ();
-          final ICommonsList <HybridAttachment> aAttachments = aDoc.listAttachments ();
-          HybridAttachment aInvoiceXml = null;
-          for (final HybridAttachment aAtt : aAttachments)
-            if (aAtt.isInvoiceXml () && aAtt.getSize () > 0)
-            {
-              aInvoiceXml = aAtt;
-              break;
-            }
-          bXmlExtractable = aInvoiceXml != null;
-
-          final CountryResolution aCountry = _resolveCountry (aInvoiceXml);
-          if (aCountry.getFinding () != null)
-            aBrHybridFindings.add (aCountry.getFinding ());
-          final EZugferdCountry eCountry = aCountry.getCountry ();
-          bDomesticDE = eCountry == EZugferdCountry.DE;
-          aSpanValidate.setAttribute ("kaltblut.country.effective", eCountry.getID ());
-          aSpanBr.setAttribute ("kaltblut.country.effective", eCountry.getID ());
-          _applyBrHybrid (aBrHybridFindings, aMeta, eCountry, aCountry.isDeCrossBorder ());
-        }
-        aSpanBr.setAttribute ("kaltblut.findings.count", aBrHybridFindings.size ());
-        aSpanBr.setStatusOk ();
-      }
-      aSwBrHybrid.stop ();
-      aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.BR_HYBRID,
-                                              Duration.ofMillis (aSwBrHybrid.getMillis ()),
-                                              aBrHybridFindings));
-
-      // Layer 2: PDF/A-3 (optional)
-      if (m_aSettings.isCheckPdfA3 ())
-      {
-        final StopWatch aSwPdfA = StopWatch.createdStarted ();
-        ICommonsList <HybridFinding> aPdfAFindings = _runPdfA3 (aSource);
-        // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
-        // An auto-detected DE requires both seller and buyer to be in DE.
-        if (m_aSettings.isApplyDePdfADowngrade () &&
-            bDomesticDE &&
-            bXmlExtractable &&
-            aPdfAFindings != null &&
-            !aPdfAFindings.isEmpty ())
-        {
-          final ICommonsList <HybridFinding> aDowngraded = new CommonsArrayList <> ();
-          for (final HybridFinding aF : aPdfAFindings)
-            aDowngraded.add (aF.getSeverity () == EHybridSeverity.ERROR ? aF.withSeverity (EHybridSeverity.WARNING)
-                                                                        : aF);
-          aPdfAFindings = aDowngraded;
-        }
-        aSwPdfA.stop ();
-        aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.PDF_A3,
-                                                Duration.ofMillis (aSwPdfA.getMillis ()),
-                                                aPdfAFindings));
-      }
-
-      final HybridValidationResult aResult = new HybridValidationResult (aLayers);
-
-      aSpanValidate.setAttribute ("kaltblut.findings.total", aResult.getFindingCount ());
-      aSpanValidate.setStatusOk ();
-      return aResult;
-    });
-  }
-
-  // ===================== Country resolution =====================
-
   /**
    * The country that gates the country-specific rules, plus the information how it was determined.
    */
@@ -219,64 +114,108 @@ public final class HybridValidator
   }
 
   /**
-   * Determine the country for the country-specific rules. The XML context is only read if enabled
-   * and no country is configured.
+   * Check the profile × country AFRelationship matrix from {@code docs/comparison.md} §5.
    *
-   * @param aInvoiceXml
-   *        the invoice XML attachment of the already opened document. May be <code>null</code>.
-   * @return the resolution; never <code>null</code>.
+   * @return a {@link HybridFinding} if the matrix is violated, or {@code null} if the relationship
+   *         is acceptable.
    */
-  @NonNull
-  private CountryResolution _resolveCountry (@Nullable final HybridAttachment aInvoiceXml)
+  @Nullable
+  private static HybridFinding _checkAfRelationshipMatrix (@NonNull final EZugferdProfile eProfile,
+                                                           @NonNull final EAFRelationship eRel,
+                                                           @NonNull final EZugferdCountry eCountry)
   {
-    if (m_aSettings.getCountry () != EZugferdCountry.OTHER || !m_aSettings.isReadXmlContext ())
-      return new CountryResolution (m_aSettings.getCountry (), false, null);
+    if (eProfile == EZugferdProfile.MINIMUM || eProfile == EZugferdProfile.BASIC_WL)
+    {
+      // Both FR and DE require Data
+      if (eRel != EAFRelationship.DATA)
+        return new HybridFinding ("BR-HYBRID-11",
+                                  EHybridSeverity.WARNING,
+                                  "Profile " +
+                                                           eProfile.getID () +
+                                                           " expects /AFRelationship 'Data' (got '" +
+                                                           eRel.getID () +
+                                                           "').",
+                                  "/Catalog/AF");
+      return null;
+    }
+    // For BASIC, EN 16931, EXTENDED, COMFORT, XRECHNUNG
+    if (eCountry == EZugferdCountry.DE)
+    {
+      if (eRel != EAFRelationship.ALTERNATIVE)
+        return new HybridFinding ("BR-HYBRID-11",
+                                  EHybridSeverity.WARNING,
+                                  "Profile " +
+                                                           eProfile.getID () +
+                                                           " in DE↔DE expects /AFRelationship 'Alternative' (got '" +
+                                                           eRel.getID () +
+                                                           "').",
+                                  "/Catalog/AF");
+      return null;
+    }
+    if (eCountry == EZugferdCountry.FR)
+    {
+      if (eProfile == EZugferdProfile.XRECHNUNG)
+        return new HybridFinding ("BR-HYBRID-11",
+                                  EHybridSeverity.WARNING,
+                                  "XRECHNUNG profile is not used in France.",
+                                  "/Catalog/AF");
 
-    // Reuse the bytes of the already opened document - don't re-open the PDF
-    final HybridXmlContext aCtx = aInvoiceXml == null ? HybridXmlContext.EMPTY
-                                                      : HybridXmlContextReader.readXmlContext (aInvoiceXml);
-    if (LOGGER.isDebugEnabled ())
-      LOGGER.debug ("Resolved XML context " + aCtx);
-
-    final EZugferdCountry eSeller = aCtx.getResolvedSellerCountry ();
-    final EZugferdCountry eBuyer = aCtx.getResolvedBuyerCountry ();
-    // An unknown buyer counts as domestic.
-    // An explicit country never knows the buyer either.
-    final boolean bBuyerUnknown = aCtx.getBuyerCountryCode () == null;
-    final boolean bDomestic = eSeller != EZugferdCountry.OTHER && (bBuyerUnknown || eBuyer == eSeller);
-
-    String sMsg;
-    if (aCtx.getSyntax () == null)
-      sMsg = "The embedded invoice XML could not be read for country auto-detection (missing, unparsable or unsupported syntax).";
-    else
-      if (eSeller == EZugferdCountry.OTHER)
-        sMsg = "No DE or FR seller country was auto-detected from the embedded invoice XML.";
-      else
-      {
-        final String sSeller = eSeller.getID ();
-        sMsg = "Country '" + sSeller + "' was auto-detected from the embedded invoice XML.";
-        if (bBuyerUnknown)
-          sMsg += " The buyer country is unknown and treated as " + sSeller + ".";
-        else
-          if (!bDomestic)
-            sMsg += " The " +
-                    sSeller +
-                    "↔" +
-                    sSeller +
-                    " rules are skipped because the buyer is not in " +
-                    sSeller +
-                    ".";
-      }
-
-    return new CountryResolution (
-                                  // The country rules only apply domestically (DE↔DE, FR↔FR)
-                                  bDomestic ? eSeller : EZugferdCountry.OTHER,
-                                  // DE seller with a buyer known to be outside DE
-                                  eSeller == EZugferdCountry.DE && !bDomestic,
-                                  new HybridFinding ("KALTBLUT-COUNTRY-AUTO", EHybridSeverity.INFORMATION, sMsg, null));
+      if (eRel != EAFRelationship.ALTERNATIVE && eRel != EAFRelationship.SOURCE && eRel != EAFRelationship.DATA)
+        return new HybridFinding ("BR-HYBRID-11",
+                                  EHybridSeverity.WARNING,
+                                  "Profile " +
+                                                           eProfile.getID () +
+                                                           " in FR↔FR expects /AFRelationship 'Alternative', 'Source' or 'Data' (got '" +
+                                                           eRel.getID () +
+                                                           "').",
+                                  "/Catalog/AF");
+      return null;
+    }
+    // Country OTHER: any of A/S/D is acceptable for these profiles.
+    if (eRel != EAFRelationship.ALTERNATIVE && eRel != EAFRelationship.SOURCE && eRel != EAFRelationship.DATA)
+      return new HybridFinding ("BR-HYBRID-11",
+                                EHybridSeverity.WARNING,
+                                "Profile " +
+                                                         eProfile.getID () +
+                                                         " expects /AFRelationship 'Alternative', 'Source' or 'Data' (got '" +
+                                                         eRel.getID () +
+                                                         "').",
+                                "/Catalog/AF");
+    return null;
   }
 
-  // ===================== BR-HYBRID rules =====================
+  private static boolean _isInFilenameCodelist (@NonNull final String sName)
+  {
+    // Code list values per the spec versions covered. We accept ZUGFeRD 1.0's mixed case too.
+    return FN_FACTUR_X.equals (sName) ||
+           FN_XRECHNUNG.equals (sName) ||
+           FN_ZUGFERD_LOWER.equals (sName) ||
+           FN_ZUGFERD_MIXED.equals (sName);
+  }
+
+  @NonNull
+  private static ICommonsList <HybridFinding> _runPdfA3 (@NonNull final IHybridSource aSource) throws IOException
+  {
+    final ServiceLoader <IPdfA3ValidatorSPI> aLoader = ServiceLoader.load (IPdfA3ValidatorSPI.class);
+    IPdfA3ValidatorSPI aValidator = null;
+    for (final IPdfA3ValidatorSPI aCandidate : aLoader)
+    {
+      aValidator = aCandidate;
+      break;
+    }
+    if (aValidator == null)
+    {
+      final ICommonsList <HybridFinding> aOut = new CommonsArrayList <> ();
+      aOut.add (new HybridFinding ("KALTBLUT-PDFA-SPI-MISSING",
+                                   EHybridSeverity.INFORMATION,
+                                   "No IPdfA3Validator implementation is registered. PDF/A-3 conformance was not checked. " +
+                                                                "Add kaltblut-verapdf to the classpath to enable veraPDF-based validation.",
+                                   null));
+      return aOut;
+    }
+    LOGGER.debug ("Running PDF/A-3 validator: " + aValidator.getClass ().getName ());
+    return aValidator.validatePdfA3 (aSource);
+  }
 
   private static void _applyBrHybrid (@NonNull final ICommonsList <HybridFinding> aOut,
                                       @NonNull final HybridMetadata aMeta,
@@ -478,111 +417,164 @@ public final class HybridValidator
                                    null));
   }
 
-  // ===================== helpers =====================
+  /**
+   * Determine the country for the country-specific rules. The XML context is only read if enabled
+   * and no country is configured.
+   *
+   * @param aInvoiceXml
+   *        the invoice XML attachment of the already opened document. May be <code>null</code>.
+   * @return the resolution; never <code>null</code>.
+   */
+  @NonNull
+  private CountryResolution _resolveCountry (@Nullable final HybridAttachment aInvoiceXml)
+  {
+    if (m_aSettings.getCountry () != EZugferdCountry.OTHER || !m_aSettings.isReadXmlContext ())
+      return new CountryResolution (m_aSettings.getCountry (), false, null);
+
+    // Reuse the bytes of the already opened document - don't re-open the PDF
+    final HybridXmlContext aCtx = aInvoiceXml == null ? HybridXmlContext.EMPTY
+                                                      : HybridXmlContextReader.readXmlContext (aInvoiceXml);
+    if (LOGGER.isDebugEnabled ())
+      LOGGER.debug ("Resolved XML context " + aCtx);
+
+    final EZugferdCountry eSeller = aCtx.getResolvedSellerCountry ();
+    final EZugferdCountry eBuyer = aCtx.getResolvedBuyerCountry ();
+    // An unknown buyer counts as domestic.
+    // An explicit country never knows the buyer either.
+    final boolean bBuyerUnknown = aCtx.getBuyerCountryCode () == null;
+    final boolean bDomestic = eSeller != EZugferdCountry.OTHER && (bBuyerUnknown || eBuyer == eSeller);
+
+    String sMsg;
+    if (aCtx.getSyntax () == null)
+      sMsg = "The embedded invoice XML could not be read for country auto-detection (missing, unparsable or unsupported syntax).";
+    else
+      if (eSeller == EZugferdCountry.OTHER)
+        sMsg = "No DE or FR seller country was auto-detected from the embedded invoice XML.";
+      else
+      {
+        final String sSeller = eSeller.getID ();
+        sMsg = "Country '" + sSeller + "' was auto-detected from the embedded invoice XML.";
+        if (bBuyerUnknown)
+          sMsg += " The buyer country is unknown and treated as " + sSeller + ".";
+        else
+          if (!bDomestic)
+            sMsg += " The " +
+                    sSeller +
+                    "↔" +
+                    sSeller +
+                    " rules are skipped because the buyer is not in " +
+                    sSeller +
+                    ".";
+      }
+
+    return new CountryResolution (
+                                  // The country rules only apply domestically (DE↔DE, FR↔FR)
+                                  bDomestic ? eSeller : EZugferdCountry.OTHER,
+                                  // DE seller with a buyer known to be outside DE
+                                  eSeller == EZugferdCountry.DE && !bDomestic,
+                                  new HybridFinding ("KALTBLUT-COUNTRY-AUTO", EHybridSeverity.INFORMATION, sMsg, null));
+  }
+
+  /** @return the mutable settings object backing this validator. */
+  @NonNull
+  public HybridValidatorSettings getSettings ()
+  {
+    return m_aSettings;
+  }
 
   /**
-   * Check the profile × country AFRelationship matrix from {@code docs/comparison.md} §5.
+   * Validate the given source.
    *
-   * @return a {@link HybridFinding} if the matrix is violated, or {@code null} if the relationship
-   *         is acceptable.
+   * @param aSource
+   *        the source.
+   * @return the aggregated result.
+   * @throws IOException
+   *         on I/O failure.
    */
-  @Nullable
-  private static HybridFinding _checkAfRelationshipMatrix (@NonNull final EZugferdProfile eProfile,
-                                                           @NonNull final EAFRelationship eRel,
-                                                           @NonNull final EZugferdCountry eCountry)
-  {
-    if (eProfile == EZugferdProfile.MINIMUM || eProfile == EZugferdProfile.BASIC_WL)
-    {
-      // Both FR and DE require Data
-      if (eRel != EAFRelationship.DATA)
-        return new HybridFinding ("BR-HYBRID-11",
-                                  EHybridSeverity.WARNING,
-                                  "Profile " +
-                                                           eProfile.getID () +
-                                                           " expects /AFRelationship 'Data' (got '" +
-                                                           eRel.getID () +
-                                                           "').",
-                                  "/Catalog/AF");
-      return null;
-    }
-    // For BASIC, EN 16931, EXTENDED, COMFORT, XRECHNUNG
-    if (eCountry == EZugferdCountry.DE)
-    {
-      if (eRel != EAFRelationship.ALTERNATIVE)
-        return new HybridFinding ("BR-HYBRID-11",
-                                  EHybridSeverity.WARNING,
-                                  "Profile " +
-                                                           eProfile.getID () +
-                                                           " in DE↔DE expects /AFRelationship 'Alternative' (got '" +
-                                                           eRel.getID () +
-                                                           "').",
-                                  "/Catalog/AF");
-      return null;
-    }
-    if (eCountry == EZugferdCountry.FR)
-    {
-      if (eProfile == EZugferdProfile.XRECHNUNG)
-        return new HybridFinding ("BR-HYBRID-11",
-                                  EHybridSeverity.WARNING,
-                                  "XRECHNUNG profile is not used in France.",
-                                  "/Catalog/AF");
-
-      if (eRel != EAFRelationship.ALTERNATIVE && eRel != EAFRelationship.SOURCE && eRel != EAFRelationship.DATA)
-        return new HybridFinding ("BR-HYBRID-11",
-                                  EHybridSeverity.WARNING,
-                                  "Profile " +
-                                                           eProfile.getID () +
-                                                           " in FR↔FR expects /AFRelationship 'Alternative', 'Source' or 'Data' (got '" +
-                                                           eRel.getID () +
-                                                           "').",
-                                  "/Catalog/AF");
-      return null;
-    }
-    // Country OTHER: any of A/S/D is acceptable for these profiles.
-    if (eRel != EAFRelationship.ALTERNATIVE && eRel != EAFRelationship.SOURCE && eRel != EAFRelationship.DATA)
-      return new HybridFinding ("BR-HYBRID-11",
-                                EHybridSeverity.WARNING,
-                                "Profile " +
-                                                         eProfile.getID () +
-                                                         " expects /AFRelationship 'Alternative', 'Source' or 'Data' (got '" +
-                                                         eRel.getID () +
-                                                         "').",
-                                "/Catalog/AF");
-    return null;
-  }
-
-  private static boolean _isInFilenameCodelist (@NonNull final String sName)
-  {
-    // Code list values per the spec versions covered. We accept ZUGFeRD 1.0's mixed case too.
-    return FN_FACTUR_X.equals (sName) ||
-           FN_XRECHNUNG.equals (sName) ||
-           FN_ZUGFERD_LOWER.equals (sName) ||
-           FN_ZUGFERD_MIXED.equals (sName);
-  }
-
-  // ---------------- PDF/A-3 SPI ----------------
-
   @NonNull
-  private static ICommonsList <HybridFinding> _runPdfA3 (@NonNull final IHybridSource aSource) throws IOException
+  public HybridValidationResult validate (@NonNull final IHybridSource aSource) throws IOException
   {
-    final ServiceLoader <IPdfA3ValidatorSPI> aLoader = ServiceLoader.load (IPdfA3ValidatorSPI.class);
-    IPdfA3ValidatorSPI aValidator = null;
-    for (final IPdfA3ValidatorSPI aCandidate : aLoader)
-    {
-      aValidator = aCandidate;
-      break;
-    }
-    if (aValidator == null)
-    {
-      final ICommonsList <HybridFinding> aOut = new CommonsArrayList <> ();
-      aOut.add (new HybridFinding ("KALTBLUT-PDFA-SPI-MISSING",
-                                   EHybridSeverity.INFORMATION,
-                                   "No IPdfA3Validator implementation is registered. PDF/A-3 conformance was not checked. " +
-                                                                "Add kaltblut-verapdf to the classpath to enable veraPDF-based validation.",
-                                   null));
-      return aOut;
-    }
-    LOGGER.debug ("Running PDF/A-3 validator: " + aValidator.getClass ().getName ());
-    return aValidator.validatePdfA3 (aSource);
+    ValueEnforcer.notNull (aSource, "Source");
+
+    return Telemetry.withSpanThrowing ("kaltblut.validate", ETelemetrySpanKind.INTERNAL, aSpanValidate -> {
+      if (aSource.getName () != null)
+        aSpanValidate.setAttribute ("kaltblut.source.name", aSource.getName ());
+      aSpanValidate.setAttribute ("kaltblut.country", m_aSettings.getCountry ().getID ());
+      aSpanValidate.setAttribute ("kaltblut.check.pdfa3", m_aSettings.isCheckPdfA3 ());
+
+      final ICommonsList <HybridValidationLayer> aLayers = new CommonsArrayList <> ();
+
+      // Layer 1: BR-HYBRID business rules
+      final ICommonsList <HybridFinding> aBrHybridFindings = new CommonsArrayList <> ();
+      boolean bXmlExtractable = false;
+      boolean bDomesticDE = m_aSettings.getCountry () == EZugferdCountry.DE;
+      final StopWatch aSwBrHybrid = StopWatch.createdStarted ();
+      // Manual span (not withSpan) so that bXmlExtractable and bDomesticDE can escape to the PDF/A
+      // downgrade logic.
+      // The nested source.read / pdf.open / xmp.parse / attachments spans attach under this one.
+      try (final ITelemetrySpan aSpanBr = Telemetry.startSpan ("kaltblut.validate.brhybrid",
+                                                               ETelemetrySpanKind.INTERNAL))
+      {
+        try (final HybridDocument aDoc = HybridDocument.open (aSource, m_aSettings.getLimits ()))
+        {
+          final HybridMetadata aMeta = aDoc.readMetadata ();
+          final ICommonsList <HybridAttachment> aAttachments = aDoc.listAttachments ();
+          HybridAttachment aInvoiceXml = null;
+          for (final HybridAttachment aAtt : aAttachments)
+            if (aAtt.isInvoiceXml () && aAtt.getSize () > 0)
+            {
+              aInvoiceXml = aAtt;
+              break;
+            }
+          bXmlExtractable = aInvoiceXml != null;
+
+          final CountryResolution aCountry = _resolveCountry (aInvoiceXml);
+          if (aCountry.getFinding () != null)
+            aBrHybridFindings.add (aCountry.getFinding ());
+          final EZugferdCountry eCountry = aCountry.getCountry ();
+          bDomesticDE = eCountry == EZugferdCountry.DE;
+          aSpanValidate.setAttribute ("kaltblut.country.effective", eCountry.getID ());
+          aSpanBr.setAttribute ("kaltblut.country.effective", eCountry.getID ());
+          _applyBrHybrid (aBrHybridFindings, aMeta, eCountry, aCountry.isDeCrossBorder ());
+        }
+        aSpanBr.setAttribute ("kaltblut.findings.count", aBrHybridFindings.size ());
+        aSpanBr.setStatusOk ();
+      }
+      aSwBrHybrid.stop ();
+      aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.BR_HYBRID,
+                                              Duration.ofMillis (aSwBrHybrid.getMillis ()),
+                                              aBrHybridFindings));
+
+      // Layer 2: PDF/A-3 (optional)
+      if (m_aSettings.isCheckPdfA3 ())
+      {
+        final StopWatch aSwPdfA = StopWatch.createdStarted ();
+        ICommonsList <HybridFinding> aPdfAFindings = _runPdfA3 (aSource);
+        // BR-FX-DE-03: in DE↔DE, PDF/A errors are downgraded if the XML is valid and extractable.
+        // An auto-detected DE requires both seller and buyer to be in DE.
+        if (m_aSettings.isApplyDePdfADowngrade () &&
+            bDomesticDE &&
+            bXmlExtractable &&
+            aPdfAFindings != null &&
+            !aPdfAFindings.isEmpty ())
+        {
+          final ICommonsList <HybridFinding> aDowngraded = new CommonsArrayList <> ();
+          for (final HybridFinding aF : aPdfAFindings)
+            aDowngraded.add (aF.getSeverity () == EHybridSeverity.ERROR ? aF.withSeverity (EHybridSeverity.WARNING)
+                                                                        : aF);
+          aPdfAFindings = aDowngraded;
+        }
+        aSwPdfA.stop ();
+        aLayers.add (new HybridValidationLayer (EHybridValidationLayerKind.PDF_A3,
+                                                Duration.ofMillis (aSwPdfA.getMillis ()),
+                                                aPdfAFindings));
+      }
+
+      final HybridValidationResult aResult = new HybridValidationResult (aLayers);
+
+      aSpanValidate.setAttribute ("kaltblut.findings.total", aResult.getFindingCount ());
+      aSpanValidate.setStatusOk ();
+      return aResult;
+    });
   }
 }

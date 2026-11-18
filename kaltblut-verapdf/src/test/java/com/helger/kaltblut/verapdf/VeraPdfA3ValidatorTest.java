@@ -51,6 +51,22 @@ import com.helger.kaltblut.testfiles.KaltblutTestFiles;
  */
 public final class VeraPdfA3ValidatorTest
 {
+  /**
+   * @return a German sample with its XMP metadata removed: the invoice XML is still extractable,
+   *         but veraPDF reports a <code>VERAPDF-FLAVOUR</code> error.
+   */
+  private static byte [] _sampleWithoutXmp (@NonNull final String sPath) throws IOException
+  {
+    final byte [] aSrc = HybridSource.fromClasspath (sPath).getBytes ();
+    try (final PDDocument aDoc = Loader.loadPDF (aSrc);
+         final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
+    {
+      aDoc.getDocumentCatalog ().setMetadata (null);
+      aDoc.save (aBAOS);
+      return aBAOS.toByteArray ();
+    }
+  }
+
   @Test
   public void testServiceLoaderRegistration ()
   {
@@ -107,22 +123,6 @@ public final class VeraPdfA3ValidatorTest
     assertEquals (1, aFindings.size ());
     assertEquals ("VERAPDF-FLAVOUR", aFindings.getFirstOrNull ().getRuleID ());
     assertEquals (EHybridSeverity.ERROR, aFindings.getFirstOrNull ().getSeverity ());
-  }
-
-  /**
-   * @return a German sample with its XMP metadata removed: the invoice XML is still extractable,
-   *         but veraPDF reports a <code>VERAPDF-FLAVOUR</code> error.
-   */
-  private static byte [] _sampleWithoutXmp (@NonNull final String sPath) throws IOException
-  {
-    final byte [] aSrc = HybridSource.fromClasspath (sPath).getBytes ();
-    try (final PDDocument aDoc = Loader.loadPDF (aSrc);
-         final NonBlockingByteArrayOutputStream aBAOS = new NonBlockingByteArrayOutputStream ())
-    {
-      aDoc.getDocumentCatalog ().setMetadata (null);
-      aDoc.save (aBAOS);
-      return aBAOS.toByteArray ();
-    }
   }
 
   @Test

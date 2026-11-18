@@ -156,170 +156,29 @@ public final class HybridXmlContextReader
   private HybridXmlContextReader ()
   {}
 
-  /**
-   * Read the routing context from the embedded invoice XML, using {@link HybridLimits#DEFAULTS}.
-   *
-   * @param aSource
-   *        the source. May not be <code>null</code>.
-   * @return the context; never <code>null</code>.
-   * @throws IOException
-   *         on I/O / PDF / XMP failure or default-limit violation.
-   * @see #readXmlContext(IHybridSource, HybridLimits)
-   */
   @NonNull
-  public static HybridXmlContext readXmlContext (@NonNull final IHybridSource aSource) throws IOException
+  private static String [] _withSlash (@NonNull final String [] aPaths)
   {
-    return readXmlContext (aSource, HybridLimits.DEFAULTS);
+    final String [] ret = new String [aPaths.length];
+    for (int i = 0; i < aPaths.length; ++i)
+      ret[i] = aPaths[i] + '/';
+    return ret;
   }
 
-  /**
-   * Read the routing context from the embedded invoice XML.
-   *
-   * @param aSource
-   *        the source. May not be <code>null</code>.
-   * @param aLimits
-   *        the limits. May not be <code>null</code>.
-   * @return the context; never <code>null</code>. When no invoice XML is present or the syntax is
-   *         unrecognised, {@link HybridXmlContext#EMPTY} is returned.
-   * @throws IOException
-   *         on I/O / PDF / XMP failure or limit violation.
-   */
-  @NonNull
-  public static HybridXmlContext readXmlContext (@NonNull final IHybridSource aSource,
-                                                 @NonNull final HybridLimits aLimits) throws IOException
+  private static void _addBranches (@NonNull final String sLeaf, @NonNull final ICommonsSet <String> aTarget)
   {
-    ValueEnforcer.notNull (aSource, "Source");
-    ValueEnforcer.notNull (aLimits, "Limits");
-    return Telemetry.withSpanThrowing ("kaltblut.xmlcontext", ETelemetrySpanKind.INTERNAL, aSpan -> {
-      final HybridXmlContext aCtx = HybridDocument.withOpenDocument (aSource, aLimits, aDoc -> {
-        for (final HybridAttachment aAtt : aDoc.listAttachments ())
-          if (aAtt.isInvoiceXml () && aAtt.getSize () > 0)
-            return _parse (aAtt.getInputStream ());
-        return HybridXmlContext.EMPTY;
-      });
-      _setSpanAttributes (aSpan, aCtx);
-      return aCtx;
-    });
-  }
-
-  /**
-   * Read the routing context from already-extracted invoice XML bytes. Callers that have already
-   * opened the PDF should use this overload or {@link #readXmlContext(HybridAttachment)} (which
-   * avoids a copy), to avoid opening and parsing the PDF a second time.
-   *
-   * @param aXml
-   *        the raw invoice XML bytes, or <code>null</code> if the PDF carries no invoice XML.
-   * @return the context; never <code>null</code>. When <code>aXml</code> is <code>null</code>,
-   *         cannot be parsed, or the syntax is unrecognised, {@link HybridXmlContext#EMPTY} is
-   *         returned.
-   */
-  @NonNull
-  public static HybridXmlContext readXmlContext (@Nullable final byte [] aXml)
-  {
-    return _readXmlContext (aXml == null ? null : new NonBlockingByteArrayInputStream (aXml));
-  }
-
-  /**
-   * Read the routing context from an already-extracted invoice XML attachment, without copying its
-   * content.
-   *
-   * @param aInvoiceXml
-   *        the invoice XML attachment. May not be <code>null</code>.
-   * @return the context; never <code>null</code>. When the XML cannot be parsed or the syntax is
-   *         unrecognised, {@link HybridXmlContext#EMPTY} is returned.
-   */
-  @NonNull
-  public static HybridXmlContext readXmlContext (@NonNull final HybridAttachment aInvoiceXml)
-  {
-    ValueEnforcer.notNull (aInvoiceXml, "InvoiceXml");
-    return _readXmlContext (aInvoiceXml.getInputStream ());
-  }
-
-  @NonNull
-  private static HybridXmlContext _readXmlContext (@Nullable final InputStream aXmlIS)
-  {
-    return Telemetry.withSpan ("kaltblut.xmlcontext", ETelemetrySpanKind.INTERNAL, aSpan -> {
-      final HybridXmlContext aCtx = aXmlIS == null ? HybridXmlContext.EMPTY : _parse (aXmlIS);
-      _setSpanAttributes (aSpan, aCtx);
-      return aCtx;
-    });
-  }
-
-  private static void _setSpanAttributes (@NonNull final ITelemetrySpan aSpan, @NonNull final HybridXmlContext aCtx)
-  {
-    aSpan.setAttribute ("kaltblut.xmlcontext.syntax", aCtx.getSyntax () != null ? aCtx.getSyntax () : "none");
-    final String sCustomizationID = aCtx.getCustomizationID ();
-    if (sCustomizationID != null)
-      aSpan.setAttribute ("kaltblut.xmlcontext.customizationid",
-                          StringHelper.getCutAfterLength (sCustomizationID, MAX_SPAN_ATTR_LENGTH));
-    aSpan.setAttribute ("kaltblut.xmlcontext.country", aCtx.getResolvedSellerCountry ().getID ());
-    aSpan.setStatusOk ();
-  }
-
-  /**
-   * @return a new, hardened StAX factory. Created per parse, because the StAX specification does
-   *         not guarantee that a factory is thread-safe.
-   */
-  @NonNull
-  private static XMLInputFactory _createInputFactory ()
-  {
-    // Untrusted payload: no DTDs (a DOCTYPE is rejected in _parse) and no external entities. The
-    // JDK default implementation is used, independent of any StAX provider on the classpath.
-    final XMLInputFactory aFactory = XMLInputFactory.newDefaultFactory ();
-    aFactory.setProperty (XMLInputFactory.IS_NAMESPACE_AWARE, Boolean.TRUE);
-    aFactory.setProperty (XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
-    aFactory.setProperty (XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
-    return aFactory;
-  }
-
-  @NonNull
-  private static HybridXmlContext _parse (@NonNull final InputStream aXmlIS)
-  {
-    XMLStreamReader aReader = null;
-    try
+    int nSlash = sLeaf.indexOf ('/');
+    while (nSlash > 0)
     {
-      aReader = _createInputFactory ().createXMLStreamReader (aXmlIS);
-      while (aReader.hasNext ())
-      {
-        final int nEvent = aReader.next ();
-        if (nEvent == XMLStreamConstants.DTD)
-        {
-          LOGGER.warn ("The embedded invoice XML contains a DOCTYPE, which is not allowed");
-          return HybridXmlContext.EMPTY;
-        }
-        if (nEvent == XMLStreamConstants.START_ELEMENT)
-        {
-          final String sNS = aReader.getNamespaceURI ();
-          final String sLocal = aReader.getLocalName ();
-          if (CII_NS_RSM.equals (sNS) && "CrossIndustryInvoice".equals (sLocal))
-            return new ContextCollector (true).collect (aReader);
-          if ((UBL_NS_INVOICE.equals (sNS) && "Invoice".equals (sLocal)) ||
-              (UBL_NS_CREDITNOTE.equals (sNS) && "CreditNote".equals (sLocal)))
-            return new ContextCollector (false).collect (aReader);
-          return HybridXmlContext.EMPTY;
-        }
-      }
-      return HybridXmlContext.EMPTY;
+      aTarget.add (sLeaf.substring (0, nSlash));
+      nSlash = sLeaf.indexOf ('/', nSlash + 1);
     }
-    catch (final XMLStreamException | RuntimeException ex)
-    {
-      // RuntimeException: the DOM based predecessor treated every parser failure as unparsable
-      LOGGER.warn ("Failed to parse the embedded invoice XML for context extraction");
-      LOGGER.debug ("Embedded invoice XML is not parsable: " + ex.getMessage ());
-      return HybridXmlContext.EMPTY;
-    }
-    finally
-    {
-      if (aReader != null)
-        try
-        {
-          aReader.close ();
-        }
-        catch (final XMLStreamException ex)
-        {
-          // ignore
-        }
-    }
+  }
+
+  @Nullable
+  private static String _upper (@Nullable final String sValue)
+  {
+    return sValue == null ? null : sValue.toUpperCase (Locale.ROOT);
   }
 
   /**
@@ -337,12 +196,6 @@ public final class HybridXmlContextReader
       return null;
     final String sPrefix = _upper (StringHelper.getCutAfterLength (sVatID, 2));
     return NON_COUNTRY_VAT_PREFIXES.contains (sPrefix) ? null : sPrefix;
-  }
-
-  @Nullable
-  private static String _upper (@Nullable final String sValue)
-  {
-    return sValue == null ? null : sValue.toUpperCase (Locale.ROOT);
   }
 
   /**
@@ -386,25 +239,6 @@ public final class HybridXmlContextReader
                            .buyerPostalCountryCode (sBuyerPostalCountry)
                            .resolvedBuyerCountry (_resolve (sBuyerVatCountry, null, sBuyerPostalCountry))
                            .build ();
-  }
-
-  @NonNull
-  private static String [] _withSlash (@NonNull final String [] aPaths)
-  {
-    final String [] ret = new String [aPaths.length];
-    for (int i = 0; i < aPaths.length; ++i)
-      ret[i] = aPaths[i] + '/';
-    return ret;
-  }
-
-  private static void _addBranches (@NonNull final String sLeaf, @NonNull final ICommonsSet <String> aTarget)
-  {
-    int nSlash = sLeaf.indexOf ('/');
-    while (nSlash > 0)
-    {
-      aTarget.add (sLeaf.substring (0, nSlash));
-      nSlash = sLeaf.indexOf ('/', nSlash + 1);
-    }
   }
 
   @NonNull
@@ -654,5 +488,171 @@ public final class HybridXmlContextReader
                      m_aVatID[PARTY_BUYER],
                      m_aPostalCountry[PARTY_BUYER]);
     }
+  }
+
+  /**
+   * @return a new, hardened StAX factory. Created per parse, because the StAX specification does
+   *         not guarantee that a factory is thread-safe.
+   */
+  @NonNull
+  private static XMLInputFactory _createInputFactory ()
+  {
+    // Untrusted payload: no DTDs (a DOCTYPE is rejected in _parse) and no external entities. The
+    // JDK default implementation is used, independent of any StAX provider on the classpath.
+    final XMLInputFactory aFactory = XMLInputFactory.newDefaultFactory ();
+    aFactory.setProperty (XMLInputFactory.IS_NAMESPACE_AWARE, Boolean.TRUE);
+    aFactory.setProperty (XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
+    aFactory.setProperty (XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
+    return aFactory;
+  }
+
+  @NonNull
+  private static HybridXmlContext _parse (@NonNull final InputStream aXmlIS)
+  {
+    XMLStreamReader aReader = null;
+    try
+    {
+      aReader = _createInputFactory ().createXMLStreamReader (aXmlIS);
+      while (aReader.hasNext ())
+      {
+        final int nEvent = aReader.next ();
+        if (nEvent == XMLStreamConstants.DTD)
+        {
+          LOGGER.warn ("The embedded invoice XML contains a DOCTYPE, which is not allowed");
+          return HybridXmlContext.EMPTY;
+        }
+        if (nEvent == XMLStreamConstants.START_ELEMENT)
+        {
+          final String sNS = aReader.getNamespaceURI ();
+          final String sLocal = aReader.getLocalName ();
+          if (CII_NS_RSM.equals (sNS) && "CrossIndustryInvoice".equals (sLocal))
+            return new ContextCollector (true).collect (aReader);
+          if ((UBL_NS_INVOICE.equals (sNS) && "Invoice".equals (sLocal)) ||
+              (UBL_NS_CREDITNOTE.equals (sNS) && "CreditNote".equals (sLocal)))
+            return new ContextCollector (false).collect (aReader);
+          return HybridXmlContext.EMPTY;
+        }
+      }
+      return HybridXmlContext.EMPTY;
+    }
+    catch (final XMLStreamException | RuntimeException ex)
+    {
+      // RuntimeException: the DOM based predecessor treated every parser failure as unparsable
+      LOGGER.warn ("Failed to parse the embedded invoice XML for context extraction");
+      LOGGER.debug ("Embedded invoice XML is not parsable: " + ex.getMessage ());
+      return HybridXmlContext.EMPTY;
+    }
+    finally
+    {
+      if (aReader != null)
+        try
+        {
+          aReader.close ();
+        }
+        catch (final XMLStreamException ex)
+        {
+          // ignore
+        }
+    }
+  }
+
+  private static void _setSpanAttributes (@NonNull final ITelemetrySpan aSpan, @NonNull final HybridXmlContext aCtx)
+  {
+    aSpan.setAttribute ("kaltblut.xmlcontext.syntax", aCtx.getSyntax () != null ? aCtx.getSyntax () : "none");
+    final String sCustomizationID = aCtx.getCustomizationID ();
+    if (sCustomizationID != null)
+      aSpan.setAttribute ("kaltblut.xmlcontext.customizationid",
+                          StringHelper.getCutAfterLength (sCustomizationID, MAX_SPAN_ATTR_LENGTH));
+    aSpan.setAttribute ("kaltblut.xmlcontext.country", aCtx.getResolvedSellerCountry ().getID ());
+    aSpan.setStatusOk ();
+  }
+
+  @NonNull
+  private static HybridXmlContext _readXmlContext (@Nullable final InputStream aXmlIS)
+  {
+    return Telemetry.withSpan ("kaltblut.xmlcontext", ETelemetrySpanKind.INTERNAL, aSpan -> {
+      final HybridXmlContext aCtx = aXmlIS == null ? HybridXmlContext.EMPTY : _parse (aXmlIS);
+      _setSpanAttributes (aSpan, aCtx);
+      return aCtx;
+    });
+  }
+
+  /**
+   * Read the routing context from the embedded invoice XML, using {@link HybridLimits#DEFAULTS}.
+   *
+   * @param aSource
+   *        the source. May not be <code>null</code>.
+   * @return the context; never <code>null</code>.
+   * @throws IOException
+   *         on I/O / PDF / XMP failure or default-limit violation.
+   * @see #readXmlContext(IHybridSource, HybridLimits)
+   */
+  @NonNull
+  public static HybridXmlContext readXmlContext (@NonNull final IHybridSource aSource) throws IOException
+  {
+    return readXmlContext (aSource, HybridLimits.DEFAULTS);
+  }
+
+  /**
+   * Read the routing context from the embedded invoice XML.
+   *
+   * @param aSource
+   *        the source. May not be <code>null</code>.
+   * @param aLimits
+   *        the limits. May not be <code>null</code>.
+   * @return the context; never <code>null</code>. When no invoice XML is present or the syntax is
+   *         unrecognised, {@link HybridXmlContext#EMPTY} is returned.
+   * @throws IOException
+   *         on I/O / PDF / XMP failure or limit violation.
+   */
+  @NonNull
+  public static HybridXmlContext readXmlContext (@NonNull final IHybridSource aSource,
+                                                 @NonNull final HybridLimits aLimits) throws IOException
+  {
+    ValueEnforcer.notNull (aSource, "Source");
+    ValueEnforcer.notNull (aLimits, "Limits");
+    return Telemetry.withSpanThrowing ("kaltblut.xmlcontext", ETelemetrySpanKind.INTERNAL, aSpan -> {
+      final HybridXmlContext aCtx = HybridDocument.withOpenDocument (aSource, aLimits, aDoc -> {
+        for (final HybridAttachment aAtt : aDoc.listAttachments ())
+          if (aAtt.isInvoiceXml () && aAtt.getSize () > 0)
+            return _parse (aAtt.getInputStream ());
+        return HybridXmlContext.EMPTY;
+      });
+      _setSpanAttributes (aSpan, aCtx);
+      return aCtx;
+    });
+  }
+
+  /**
+   * Read the routing context from already-extracted invoice XML bytes. Callers that have already
+   * opened the PDF should use this overload or {@link #readXmlContext(HybridAttachment)} (which
+   * avoids a copy), to avoid opening and parsing the PDF a second time.
+   *
+   * @param aXml
+   *        the raw invoice XML bytes, or <code>null</code> if the PDF carries no invoice XML.
+   * @return the context; never <code>null</code>. When <code>aXml</code> is <code>null</code>,
+   *         cannot be parsed, or the syntax is unrecognised, {@link HybridXmlContext#EMPTY} is
+   *         returned.
+   */
+  @NonNull
+  public static HybridXmlContext readXmlContext (@Nullable final byte [] aXml)
+  {
+    return _readXmlContext (aXml == null ? null : new NonBlockingByteArrayInputStream (aXml));
+  }
+
+  /**
+   * Read the routing context from an already-extracted invoice XML attachment, without copying its
+   * content.
+   *
+   * @param aInvoiceXml
+   *        the invoice XML attachment. May not be <code>null</code>.
+   * @return the context; never <code>null</code>. When the XML cannot be parsed or the syntax is
+   *         unrecognised, {@link HybridXmlContext#EMPTY} is returned.
+   */
+  @NonNull
+  public static HybridXmlContext readXmlContext (@NonNull final HybridAttachment aInvoiceXml)
+  {
+    ValueEnforcer.notNull (aInvoiceXml, "InvoiceXml");
+    return _readXmlContext (aInvoiceXml.getInputStream ());
   }
 }

@@ -194,15 +194,6 @@ public final class HybridXmlContext
   }
 
   /**
-   * @return a new builder. The resolved countries default to {@link EZugferdCountry#OTHER}.
-   */
-  @NonNull
-  public static Builder builder ()
-  {
-    return new Builder ();
-  }
-
-  /**
    * Builder for {@link HybridXmlContext}.
    *
    * @author Alexandre Gabriel Carvalho Silva
@@ -347,5 +338,14 @@ public final class HybridXmlContext
                                    m_sBuyerPostalCountryCode,
                                    m_eResolvedBuyerCountry);
     }
+  }
+
+  /**
+   * @return a new builder. The resolved countries default to {@link EZugferdCountry#OTHER}.
+   */
+  @NonNull
+  public static Builder builder ()
+  {
+    return new Builder ();
   }
 }
