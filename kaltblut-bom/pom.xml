@@ -27,7 +27,7 @@
   </parent>
   <groupId>com.helger.kaltblut</groupId>
   <artifactId>kaltblut-bom</artifactId>
-  <version>0.9.8-SNAPSHOT</version>
+  <version>1.0.0</version>
   <packaging>pom</packaging>
   <name>kaltblut-bom</name>
   <description>Bill of Materials for all kaltblut artifacts</description>
@@ -71,4 +71,8 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+
+  <scm>
+    <tag>kaltblut-parent-pom-1.0.0</tag>
+  </scm>
 </project>
