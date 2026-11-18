@@ -162,5 +162,5 @@ summary of XMP namespace ↔ embedded-XML-filename mappings — keep it in sync 
 
 ## Releases & versioning
 
-Current version is `0.9.7-SNAPSHOT` (parent POM). Parent: `com.helger:parent-pom:3.2.0`.
+Current version is `0.9.8-SNAPSHOT` (parent POM). Parent: `com.helger:parent-pom:3.2.0`.
 Snapshots are deployed by CI from JDK 17 builds on push via the `release-snapshot` profile.

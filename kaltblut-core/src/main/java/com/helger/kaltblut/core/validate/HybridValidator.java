@@ -120,53 +120,14 @@ public final class HybridValidator
             }
           bXmlExtractable = aInvoiceXml != null;
 
-          final HybridXmlContext aCtx = _readXmlContext (aInvoiceXml);
-          EZugferdCountry eCountry = m_aSettings.getCountry ();
-          boolean bDeCrossBorder = false;
-          if (aCtx != null)
-          {
-            final EZugferdCountry eSeller = aCtx.getResolvedSellerCountry ();
-            final EZugferdCountry eBuyer = aCtx.getResolvedBuyerCountry ();
-            // An unknown buyer counts as domestic.
-            // An explicit country never knows the buyer either.
-            final String sBuyerCountry = aCtx.getBuyerCountryCode ();
-            final boolean bBuyerUnknown = sBuyerCountry == null;
-            final boolean bDomestic = eSeller != EZugferdCountry.OTHER && (bBuyerUnknown || eBuyer == eSeller);
-            // The country rules only apply domestically (DE↔DE, FR↔FR)
-            eCountry = bDomestic ? eSeller : EZugferdCountry.OTHER;
-            // DE seller with a buyer known to be outside DE
-            bDeCrossBorder = eSeller == EZugferdCountry.DE && !bDomestic;
-            String sMsg;
-            if (aCtx.getSyntax () == null)
-              sMsg = "The embedded invoice XML could not be read for country auto-detection (missing, unparsable or unsupported syntax).";
-            else
-              if (eSeller == EZugferdCountry.OTHER)
-                sMsg = "No DE or FR seller country was auto-detected from the embedded invoice XML.";
-              else
-              {
-                final String sSeller = eSeller.getID ();
-                sMsg = "Country '" + sSeller + "' was auto-detected from the embedded invoice XML.";
-                if (bBuyerUnknown)
-                  sMsg += " The buyer country is unknown and treated as " + sSeller + ".";
-                else
-                  if (!bDomestic)
-                    sMsg += " The " +
-                            sSeller +
-                            "↔" +
-                            sSeller +
-                            " rules are skipped because the buyer is not in " +
-                            sSeller +
-                            ".";
-              }
-            aBrHybridFindings.add (new HybridFinding ("KALTBLUT-COUNTRY-AUTO",
-                                                      EHybridSeverity.INFORMATION,
-                                                      sMsg,
-                                                      null));
-          }
+          final CountryResolution aCountry = _resolveCountry (aInvoiceXml);
+          if (aCountry.getFinding () != null)
+            aBrHybridFindings.add (aCountry.getFinding ());
+          final EZugferdCountry eCountry = aCountry.getCountry ();
           bDomesticDE = eCountry == EZugferdCountry.DE;
           aSpanValidate.setAttribute ("kaltblut.country.effective", eCountry.getID ());
           aSpanBr.setAttribute ("kaltblut.country.effective", eCountry.getID ());
-          _applyBrHybrid (aBrHybridFindings, aMeta, eCountry, bDeCrossBorder);
+          _applyBrHybrid (aBrHybridFindings, aMeta, eCountry, aCountry.isDeCrossBorder ());
         }
         aSpanBr.setAttribute ("kaltblut.findings.count", aBrHybridFindings.size ());
         aSpanBr.setStatusOk ();
@@ -212,24 +173,107 @@ public final class HybridValidator
   // ===================== Country resolution =====================
 
   /**
-   * Read the XML context, if enabled and no country is configured.
+   * The country that gates the country-specific rules, plus the information how it was determined.
+   */
+  private static final class CountryResolution
+  {
+    private final EZugferdCountry m_eCountry;
+    private final boolean m_bDeCrossBorder;
+    private final HybridFinding m_aFinding;
+
+    CountryResolution (@NonNull final EZugferdCountry eCountry,
+                       final boolean bDeCrossBorder,
+                       @Nullable final HybridFinding aFinding)
+    {
+      m_eCountry = eCountry;
+      m_bDeCrossBorder = bDeCrossBorder;
+      m_aFinding = aFinding;
+    }
+
+    /**
+     * @return the country for the country-specific rules. Never <code>null</code>.
+     */
+    @NonNull
+    EZugferdCountry getCountry ()
+    {
+      return m_eCountry;
+    }
+
+    /**
+     * @return <code>true</code> for a DE seller with a buyer known to be outside DE.
+     */
+    boolean isDeCrossBorder ()
+    {
+      return m_bDeCrossBorder;
+    }
+
+    /**
+     * @return the <code>KALTBLUT-COUNTRY-AUTO</code> finding, or <code>null</code> if the country
+     *         was not auto-detected.
+     */
+    @Nullable
+    HybridFinding getFinding ()
+    {
+      return m_aFinding;
+    }
+  }
+
+  /**
+   * Determine the country for the country-specific rules. The XML context is only read if enabled
+   * and no country is configured.
    *
    * @param aInvoiceXml
    *        the invoice XML attachment of the already opened document. May be <code>null</code>.
-   * @return the context, or <code>null</code> if it is not used.
+   * @return the resolution; never <code>null</code>.
    */
-  @Nullable
-  private HybridXmlContext _readXmlContext (@Nullable final HybridAttachment aInvoiceXml)
+  @NonNull
+  private CountryResolution _resolveCountry (@Nullable final HybridAttachment aInvoiceXml)
   {
     if (m_aSettings.getCountry () != EZugferdCountry.OTHER || !m_aSettings.isReadXmlContext ())
-      return null;
+      return new CountryResolution (m_aSettings.getCountry (), false, null);
 
     // Reuse the bytes of the already opened document - don't re-open the PDF
     final HybridXmlContext aCtx = aInvoiceXml == null ? HybridXmlContext.EMPTY
                                                       : HybridXmlContextReader.readXmlContext (aInvoiceXml);
     if (LOGGER.isDebugEnabled ())
       LOGGER.debug ("Resolved XML context " + aCtx);
-    return aCtx;
+
+    final EZugferdCountry eSeller = aCtx.getResolvedSellerCountry ();
+    final EZugferdCountry eBuyer = aCtx.getResolvedBuyerCountry ();
+    // An unknown buyer counts as domestic.
+    // An explicit country never knows the buyer either.
+    final boolean bBuyerUnknown = aCtx.getBuyerCountryCode () == null;
+    final boolean bDomestic = eSeller != EZugferdCountry.OTHER && (bBuyerUnknown || eBuyer == eSeller);
+
+    String sMsg;
+    if (aCtx.getSyntax () == null)
+      sMsg = "The embedded invoice XML could not be read for country auto-detection (missing, unparsable or unsupported syntax).";
+    else
+      if (eSeller == EZugferdCountry.OTHER)
+        sMsg = "No DE or FR seller country was auto-detected from the embedded invoice XML.";
+      else
+      {
+        final String sSeller = eSeller.getID ();
+        sMsg = "Country '" + sSeller + "' was auto-detected from the embedded invoice XML.";
+        if (bBuyerUnknown)
+          sMsg += " The buyer country is unknown and treated as " + sSeller + ".";
+        else
+          if (!bDomestic)
+            sMsg += " The " +
+                    sSeller +
+                    "↔" +
+                    sSeller +
+                    " rules are skipped because the buyer is not in " +
+                    sSeller +
+                    ".";
+      }
+
+    return new CountryResolution (
+                                  // The country rules only apply domestically (DE↔DE, FR↔FR)
+                                  bDomestic ? eSeller : EZugferdCountry.OTHER,
+                                  // DE seller with a buyer known to be outside DE
+                                  eSeller == EZugferdCountry.DE && !bDomestic,
+                                  new HybridFinding ("KALTBLUT-COUNTRY-AUTO", EHybridSeverity.INFORMATION, sMsg, null));
   }
 
   // ===================== BR-HYBRID rules =====================

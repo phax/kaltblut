@@ -425,7 +425,12 @@ Apache License, Version 2.0.
 ## News and Noteworthy
 
 v0.9.8 - work in progress
-* Added opt-in country auto-detection from the embedded invoice XML (`HybridValidatorSettings.setReadXmlContext`, CLI `--read-xml-context`)
+* Added opt-in country auto-detection from the embedded invoice XML (`HybridValidatorSettings.setReadXmlContext`, CLI `--read-xml-context`).
+  The country rules only apply if seller and buyer are in the same country.
+  See [#2](https://github.com/phax/kaltblut/pull/2) - thx @KbraBass
+* Added the new classes `HybridXmlContext` (with builder) and `HybridXmlContextReader` to read BT-23, BT-24 and the seller and buyer countries from CII and UBL payloads.
+* Added `EZugferdCountry.getFromCountryCode` and `HybridAttachment.getInputStream`.
+* Added the non-standard warnings `KALTBLUT-DE-01` and `KALTBLUT-DE-02` for a DE seller using MINIMUM or BASIC WL with a buyer outside DE.
 
 v0.9.7 - 2026-11-15
 * Added the new module `kaltblut-bom` - a Bill of Materials for all published Kaltblut artifacts

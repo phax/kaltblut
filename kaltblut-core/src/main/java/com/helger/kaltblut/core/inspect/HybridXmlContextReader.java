@@ -238,7 +238,7 @@ public final class HybridXmlContextReader
   @NonNull
   private static HybridXmlContext _readXmlContext (@Nullable final InputStream aXmlIS)
   {
-    return Telemetry.withSpanThrowing ("kaltblut.xmlcontext", ETelemetrySpanKind.INTERNAL, aSpan -> {
+    return Telemetry.withSpan ("kaltblut.xmlcontext", ETelemetrySpanKind.INTERNAL, aSpan -> {
       final HybridXmlContext aCtx = aXmlIS == null ? HybridXmlContext.EMPTY : _parse (aXmlIS);
       _setSpanAttributes (aSpan, aCtx);
       return aCtx;
