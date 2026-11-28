@@ -325,11 +325,13 @@ environment variables with `-e` (e.g. `-e OTEL_ENABLED=true -e OTEL_EXPORTER_OTL
 |------|--------|
 | `docker/build.sh snapshot [--mvn]` | The current `-SNAPSHOT` version for this machine, loaded into the local Docker, tagged `<version>` and `snapshot`, smoke tested |
 | `docker/build.sh snapshot --push [--mvn]` | The same for linux/amd64 and linux/arm64, pushed |
-| `docker/build.sh release [--mvn]` | A released version for linux/amd64 and linux/arm64, pushed, tagged `<version>` and `latest` |
+| `docker/build.sh release <version>` | A released version for linux/amd64 and linux/arm64, smoke tested, pushed, tagged `<version>` and `latest` |
 
-`--mvn` builds the fat JAR first; without it, `kaltblut-cli/target/kaltblut-cli-full.jar` must be the JAR of the
-version in `pom.xml` (checked via its manifest). `IMAGE` overrides the image name `phelger/kaltblut`. Pushing needs a
-`docker login` first.
+A snapshot image uses the local fat JAR: `--mvn` builds it first; without it,
+`kaltblut-cli/target/kaltblut-cli-full.jar` must be the JAR of the version in `pom.xml` (checked via its manifest).
+A release image always uses the JAR of the GitHub release: `kaltblut-cli-<version>-shaded.jar`, attached to the
+release of the tag `kaltblut-parent-pom-<version>`. `IMAGE` overrides the image name `phelger/kaltblut`. Pushing
+needs a `docker login` first.
 
 ## Building
 

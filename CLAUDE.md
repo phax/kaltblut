@@ -39,8 +39,10 @@ The CLI fat JAR comes out of `mvn clean package` at
 
 Docker image `phelger/kaltblut` of the CLI: `kaltblut-cli/Dockerfile` (Temurin 25 JRE, copies
 `target/kaltblut-cli-full.jar`, working directory `/data`) built with `docker/build.sh`
-(`snapshot [--mvn] [--push]` / `release [--mvn]`). The fat JAR name has no version, so the script
-checks the version via the JAR manifest's `Implementation-Version`.
+(`snapshot [--mvn] [--push]` / `release <version>`). Snapshots use the local fat JAR; releases always
+download `kaltblut-cli-<version>-shaded.jar` from the GitHub release of the tag
+`kaltblut-parent-pom-<version>`, so that asset must be attached to every release. The fat JAR name
+has no version, so the script checks the version via the JAR manifest's `Implementation-Version`.
 
 ## Module layout & dependency direction
 
