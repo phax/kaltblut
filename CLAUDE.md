@@ -37,6 +37,11 @@ The CLI fat JAR comes out of `mvn clean package` at
 `com.helger.kaltblut.cli.KaltblutMain`; subcommands are `inspect`, `extract`, `attachments`,
 `validate`.
 
+Docker image `phelger/kaltblut` of the CLI: `kaltblut-cli/Dockerfile` (Temurin 25 JRE, copies
+`target/kaltblut-cli-full.jar`, working directory `/data`) built with `docker/build.sh`
+(`snapshot [--mvn] [--push]` / `release [--mvn]`). The fat JAR name has no version, so the script
+checks the version via the JAR manifest's `Implementation-Version`.
+
 ## Module layout & dependency direction
 
 Four modules, strictly layered (parent POM at repo root), plus `kaltblut-bom`:
@@ -162,5 +167,5 @@ summary of XMP namespace ↔ embedded-XML-filename mappings — keep it in sync 
 
 ## Releases & versioning
 
-Current version is `0.9.8-SNAPSHOT` (parent POM). Parent: `com.helger:parent-pom:3.2.0`.
+Current version is `1.0.1-SNAPSHOT` (parent POM). Parent: `com.helger:parent-pom:3.2.0`.
 Snapshots are deployed by CI from JDK 17 builds on push via the `release-snapshot` profile.

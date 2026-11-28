@@ -105,7 +105,8 @@ This is a multi-module Maven project:
 - `kaltblut-testfiles` — shared test fixtures (sample PDFs + classpath-resource locator).
 - `kaltblut-verapdf` — PDF/A-3 validation adapter that wires veraPDF to the
   `IPdfA3ValidatorSPI` SPI. Optional; pull it in only if you need PDF/A-3 conformance checks.
-- `kaltblut-cli` — the command-line client (picocli). Builds a standalone fat JAR.
+- `kaltblut-cli` — the command-line client (picocli). Builds a standalone fat JAR; contains the
+  `Dockerfile` of the Docker image (see [Docker](#docker)).
 - `kaltblut-bom` — Bill of Materials that pins the versions of all published library artifacts
   (`kaltblut-core`, `kaltblut-verapdf`, `kaltblut-testfiles`).
 
@@ -302,6 +303,34 @@ java -jar kaltblut-cli-full.jar validate -c DE invoice.pdf
 java -jar kaltblut-cli-full.jar validate --no-pdfa invoice.pdf
 ```
 
+### Docker
+
+`kaltblut-cli/Dockerfile` builds an image with the command line client (Eclipse Temurin 25 JRE); the arguments of
+`docker run` after the image name are passed to the client. Mount the files to work on to `/data`, the working
+directory of the image:
+
+```shell
+docker run --rm -v "$PWD:/data" phelger/kaltblut inspect invoice.pdf
+docker run --rm -v "$PWD:/data" phelger/kaltblut extract -o out invoice.pdf
+docker run --rm -v "$PWD:/data" phelger/kaltblut validate -c DE invoice.pdf
+```
+
+Only files below the mounted folder are visible, and output directories must be inside it too. The exit code of the
+client is the exit code of `docker run`. Telemetry is enabled the same way as for the JAR, by passing the
+environment variables with `-e` (e.g. `-e OTEL_ENABLED=true -e OTEL_EXPORTER_OTLP_ENDPOINT=...`).
+
+`docker/build.sh` builds the image:
+
+| Call | Builds |
+|------|--------|
+| `docker/build.sh snapshot [--mvn]` | The current `-SNAPSHOT` version for this machine, loaded into the local Docker, tagged `<version>` and `snapshot`, smoke tested |
+| `docker/build.sh snapshot --push [--mvn]` | The same for linux/amd64 and linux/arm64, pushed |
+| `docker/build.sh release [--mvn]` | A released version for linux/amd64 and linux/arm64, pushed, tagged `<version>` and `latest` |
+
+`--mvn` builds the fat JAR first; without it, `kaltblut-cli/target/kaltblut-cli-full.jar` must be the JAR of the
+version in `pom.xml` (checked via its manifest). `IMAGE` overrides the image name `phelger/kaltblut`. Pushing needs a
+`docker login` first.
+
 ## Building
 
 Requires Java 17+ and Maven.
@@ -423,6 +452,10 @@ discovered via `ServiceLoader`; only the first implementation found is used.
 Apache License, Version 2.0.
 
 ## News and Noteworthy
+
+v1.0.1 - work in progress
+* Added a Docker image `phelger/kaltblut` for the command line client (`kaltblut-cli/Dockerfile`, built with `docker/build.sh`).
+  See [#3](https://github.com/phax/kaltblut/issues/3)
 
 v1.0.0 - 2026-11-18
 * Added opt-in country auto-detection from the embedded invoice XML (`HybridValidatorSettings.setReadXmlContext`, CLI `--read-xml-context`).
